@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "vercel-build": "npm run fetch && npm run build",
     "preview": "vite preview",
     "fetch": "tsx scripts/fetch.ts",
     "typecheck": "tsc -b --noEmit"

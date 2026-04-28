@@ -78,6 +78,20 @@ The fetcher is configured at the top of `scripts/fetch.ts`:
 The site will be available at
 `https://<your-username>.github.io/<repo-name>/`.
 
+## Deploying to Vercel
+
+1. Import the repo into Vercel. Framework preset: **Vite** (auto-detected).
+2. Add an environment variable `GITHUB_TOKEN` with a PAT that can read your
+   tracked repos (no extra scopes needed for public-only).
+3. Deploy. Vercel runs the `vercel-build` script
+   (`npm run fetch && npm run build`), so the JSON is generated fresh in
+   each build.
+
+Vercel rebuilds automatically on every push to `master`. To refresh the
+data on a schedule without code changes, create a *Deploy Hook* in
+*Project Settings > Git* and have any cron service (cron-job.org, a tiny
+GitHub Action, etc.) `POST` to it on whatever cadence you want.
+
 ## Adding a new event type
 
 The data shape is the single source of truth, so adding a type touches three
