@@ -112,7 +112,16 @@ export function FilterBar({
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
-        className="text-xs bg-zinc-900 border border-zinc-800 rounded px-2 py-1 sm:py-0.5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-orange-500/60 min-w-0 flex-1 max-w-xs"
+        className={[
+          'px-2 py-1 sm:py-0.5 text-xs rounded border transition',
+          'min-w-0 flex-1 max-w-xs placeholder:text-zinc-600 focus:outline-none',
+          'border-zinc-800 bg-transparent text-zinc-500',
+          'hover:text-zinc-300 hover:border-zinc-700',
+          'focus:border-zinc-500 focus:bg-zinc-800 focus:text-zinc-100',
+          repoQuery && 'border-zinc-500 bg-zinc-800 text-zinc-100',
+        ]
+          .filter(Boolean)
+          .join(' ')}
       />
       {repoQuery && (
         <button
