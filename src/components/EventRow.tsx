@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Event } from '../types';
 import { EVENT_TYPE_META } from '../eventTypes';
 
@@ -32,7 +33,9 @@ function FilterButton({
   );
 }
 
-export function EventRow({ event, onSelectRepo, onSelectActor }: Props) {
+export const EventRow = memo(EventRowImpl);
+
+function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
   const meta = EVENT_TYPE_META[event.type];
   const time = event.timestamp.slice(11, 16);
   const repoShort = event.repo.split('/').pop() ?? event.repo;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadEvents } from './lib/loadEvents';
 import { useUrlSet } from './lib/useUrlSet';
 import { Timeline } from './components/Timeline';
@@ -40,6 +40,17 @@ export function App() {
     );
   }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
 
+  const { set: setRepoSelection } = repoFilter;
+  const { set: setActorSelection } = actorFilter;
+  const onSelectRepo = useCallback(
+    (r: string) => setRepoSelection(new Set([r])),
+    [setRepoSelection],
+  );
+  const onSelectActor = useCallback(
+    (a: string) => setActorSelection(new Set([a])),
+    [setActorSelection],
+  );
+
   if (error) {
     return (
       <div className="p-6 text-red-400">
@@ -73,11 +84,7 @@ export function App() {
           actorFilter={actorFilter}
         />
       </div>
-      <Timeline
-        events={filtered}
-        onSelectRepo={(r) => repoFilter.set(new Set([r]))}
-        onSelectActor={(a) => actorFilter.set(new Set([a]))}
-      />
+      <Timeline events={filtered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
       <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900">
         last fetched {generatedLabel} - window {data.windowDays}d - {data.repos.length} repo(s)
       </footer>
