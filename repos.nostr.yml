@@ -4,6 +4,7 @@ repos:
   - ArjenStens/nostr-epoxy-reverse-proxy
   - arkin0x/cyberspace
   - atrifat/nostr-filter-relay
+  - AustinKelsay/nip55-ios-test
   - BcnBitcoinOnly/bbo-manifesto
   - believethehype/dvm
   - bitvora/algo-relay
@@ -15,6 +16,8 @@ repos:
   - CodyTseng/jumble
   - CodyTseng/nostr-relay-nestjs
   - CodyTseng/nostr-relay-tray
+  - ContextVM/contextvm-docs
+  - ContextVM/cvmi
   - coracle-social/coracle
   - damus-io/damus
   - damus-io/notedeck
@@ -23,10 +26,45 @@ repos:
   - dluvian/voyage
   - dskvr/nostr-watch
   - dtdannen/dvmdash
+  - dtonon/bitalk
+  - dtonon/bitcoin-foldable
+  - dtonon/ch
+  - dtonon/chronicle
+  - dtonon/fevela
+  - dtonon/nostr-pfp-analyzer
+  - dtonon/nostr-ruby
+  - dtonon/npanel
+  - dtonon/nstart
+  - dtonon/oracolo
+  - dtonon/yoink
   - eskema/alphaama
+  - fiatjaf/alts
+  - fiatjaf/eventstore
+  - fiatjaf/js-eventstore-benchmark
+  - fiatjaf/khatru
+  - fiatjaf/nwak
+  - fiatjaf/yakbak2
   - flox1an/nostube
   - Fonta1n3/FullyNoded
   - frnandu/yana
+  - FROSTR-ORG/bifrost
+  - FROSTR-ORG/bifrost-rs
+  - FROSTR-ORG/frost2x
+  - FROSTR-ORG/igloo-android
+  - FROSTR-ORG/igloo-chrome
+  - frostr-org/igloo-cli
+  - FROSTR-ORG/igloo-desktop
+  - FROSTR-ORG/igloo-home
+  - FROSTR-ORG/igloo-ios
+  - FROSTR-ORG/igloo-pwa
+  - FROSTR-ORG/igloo-server
+  - frostr-org/igloo-server-store
+  - FROSTR-ORG/igloo-shared
+  - FROSTR-ORG/igloo-shell
+  - FROSTR-ORG/igloo-ui
+  - frostr-org/igloo-web
+  - FROSTR-ORG/nostr-connect
+  - FROSTR-ORG/web-demo
   - futurepaul/hypernote
   - futurepaul/hypernote-elements
   - Galaxoid-Labs/Seer
@@ -35,6 +73,29 @@ repos:
   - greenart7c3/Citrine
   - gzuuus/linktr-nostr
   - haorendashu/nostrmo
+  - hzrd149/applesauce
+  - hzrd149/backyard-explorer
+  - hzrd149/blossom
+  - hzrd149/blossom-account-server
+  - hzrd149/blossom-audit
+  - hzrd149/blossom-client-sdk
+  - hzrd149/blossomservers
+  - hzrd149/cherry-tree
+  - hzrd149/flower-cache
+  - hzrd149/node-red-contrib-applesauce
+  - hzrd149/node-red-contrib-rx-nostr
+  - hzrd149/nostr-bucket
+  - hzrd149/nostr-gatekeeper
+  - hzrd149/nostr-idb
+  - hzrd149/nostr-junk-drawer
+  - hzrd149/nostr-secretary
+  - hzrd149/nostrudel
+  - hzrd149/nsite-gateway
+  - hzrd149/nsite-homepage
+  - hzrd149/nsite-ts
+  - hzrd149/umbrel-blob-box
+  - hzrd149/vite-plugin-funding
+  - hzrd149/window.nostrdb.js
   - irislib/iris-messenger
   - KoalaSat/pokey
   - leo-lox/camelus
@@ -66,6 +127,12 @@ repos:
   - OpenAgentsInc/arcade
   - ossrs/srs
   - ostyjs/create-osty
+  - pablof7z/hl-studio
+  - pablof7z/mcp-money
+  - pablof7z/NDKSwift
+  - pablof7z/olas-ios
+  - pablof7z/tenex
+  - pablof7z/walker
   - paulmillr/noble-ciphers
   - Peach2Peach/peach-app
   - persianccbook/nips-persian
@@ -82,7 +149,16 @@ repos:
   - sepehr-safari/nostribe-web-client
   - sepehr-safari/pinstr
   - shopstr-eng/shopstr
+  - SnowCait/cloudflare-http-proxy
+  - SnowCait/nostr-authorization
+  - SnowCait/nostr-bots
+  - SnowCait/nostr-summary
+  - SnowCait/nostr-widgets
   - SnowCait/nostter
+  - SnowCait/snowflare
+  - SnowCait/snowflare-for-remote-signer
+  - SnowCait/SteamNowPlaying
+  - SnowCait/user-notes-search
   - suhailsaqan/swae
   - swentel/nostr-php
   - tami1A84/null--nostr
@@ -90,10 +166,24 @@ repos:
   - trbouma/safebox
   - Trustroots/nostroots
   - TsukemonoGit/lumilumi
+  - vertex-lab/crawler_v2
+  - vertex-lab/nostr-sqlite
+  - vertex-lab/npub.world
   - vicariousdrama/cornychat
   - VincenzoImp/bigbrotr
   - vitorpamplona/amethyst
+  - vitorpamplona/amethyst-push-notif-server
+  - vitorpamplona/lazereyes
+  - vitorpamplona/negentropy-kmp
   - vstabile/sig4sats-script
+  - YakiHonne/mobile-app
+  - YakiHonne/web-app
+  - zapstore/blossomd
+  - zapstore/ftsrelay
+  - zapstore/indexer
+  - zapstore/relay
+  - zapstore/website
   - zapstore/zapstore
+  - zapstore/zapstore-cli
   - ZharlieW/Aegis
   - zmeyer44/flockstr

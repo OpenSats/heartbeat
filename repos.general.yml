@@ -1,9 +1,17 @@
 repos:
   - 05nelsonm/kmp-tor
+  - 256-Foundation/asic-rs
+  - 256-Foundation/btc-toolkit
+  - 256-Foundation/emberone00-pcb
+  - 256-Foundation/Hydra-Pool
+  - 256-Foundation/Libre-Board
   - aaron-recompile/btcaaron
   - allpurposemachines/hypermap
   - andreasgriffin/bitcoin-safe
   - areabitcoin/Bitcoin-4-All
+  - asmap/asmap-data
+  - asmap/kartograf
+  - asmap/rpki-client-nix
   - avencera/fast_rss
   - avencera/rustywind
   - avencera/splitmonic
@@ -15,6 +23,17 @@ repos:
   - bitcoin/bips
   - bitcoin/bitcoin
   - bitcoindevkit/bdk
+  - bitcoinerlab/bitcoinjs-message
+  - bitcoinerlab/coinselect
+  - bitcoinerlab/descriptors
+  - bitcoinerlab/discovery
+  - bitcoinerlab/explorer
+  - bitcoinerlab/miniscript
+  - bitcoinerlab/miniscript-policies
+  - bitcoinerlab/playground
+  - bitcoinerlab/tape
+  - bitcoinerlab/thunderden
+  - bitcoinerlab/web
   - bitcoinfuzz/bitcoinfuzz
   - bitcoinppl/cove
   - bitcoinresearchkit/brk
@@ -25,6 +44,12 @@ repos:
   - block/bitcoin-augur
   - block/bitcoin-augur-reference
   - braidpool/braidpool
+  - btcpayserver/btcpayserver
+  - callebtc/bitchat-observer
+  - callebtc/cashu-auditor
+  - callebtc/cashu-decoder
+  - callebtc/nfchat
+  - callebtc/nostr-follow-packs
   - cashubtc/cashu-ts
   - cashubtc/cdk
   - cashubtc/eNuts
@@ -49,11 +74,18 @@ repos:
   - gandlafbtc/nutstash-wallet
   - getlipa/invoice-detective
   - GigaBitcoin/secp256k1.swift
+  - hodlinator/bitcoin
+  - hodlinator/hodlinator
   - hsjoberg/blixt-wallet
   - ipms-io/nlightning
+  - janb84/BitcoinKernel.NET
   - jmoik/bitcoin
   - joinmarket-ng/joinmarket-ng
   - jsarenik/bitcoin-faucet-shell
+  - jurraca/bechamel
+  - jurraca/nostr_ex
+  - jurraca/nostr_publisher
+  - jurraca/noxir
   - JWBurgers/deciphering-bitcoin
   - kibo-money/kibo
   - kuenrg153/bitshoka
@@ -64,13 +96,41 @@ repos:
   - lawalletio/lawallet-nwc
   - ldksplicing/ldk-splicing
   - lescuer97/nutmix
+  - libbitcoin/libbitcoin-build
+  - libbitcoin/libbitcoin-database
+  - libbitcoin/libbitcoin-network
+  - libbitcoin/libbitcoin-node
+  - libbitcoin/libbitcoin-server
+  - libbitcoin/libbitcoin-system
+  - LibreriadeSatoshi/b4os-landing-astro
+  - LibreriadeSatoshi/b4os-master-dashboard
+  - LibreriadeSatoshi/Bitcoin-Technical-Foundations
+  - LibreriadeSatoshi/bitdevs-lat
+  - LibreriadeSatoshi/Bitdevs-Latino
+  - LibreriadeSatoshi/dashboard-classroom-b4os
+  - LibreriadeSatoshi/Master-Bitcoin-From-Command-Line
+  - LibreriadeSatoshi/The-Protocol-Experts
+  - LibreriadeSatoshi/update-legacywallet
   - lightningdevkit/rust-lightning
   - lightningnetwork/lnd
   - lnbits/lnbits
+  - LNHANCE-Expedition/bolts
+  - LNHANCE-Expedition/mccv
+  - LNHANCE-Expedition/rust-lightning
   - lnproxy/lnproxy
+  - m1sterc001guy/collab
+  - m1sterc001guy/fedimint
+  - m1sterc001guy/fedimintd-mobile
+  - m1sterc001guy/roastr
   - macgyver13/silent-payment-hub
+  - maflcko/b-c-cov
+  - maflcko/b-c-gui-translations-review
+  - maflcko/b-c-nightly
+  - maflcko/bitcoin-core-nightly
+  - maflcko/DrahtBot
   - michaelWuensch/BitBanana
   - minibits-cash/minibits_wallet
+  - morehouse/smite
   - MostroP2P/mostro
   - mplsgrant/warnet
   - MyFirstBitcoin/Light-Node-Directory
@@ -81,9 +141,15 @@ repos:
   - orangeshyguy21/orchard
   - payjoin/rust-payjoin
   - Peach2Peach/peach-app
+  - pmienk/libbitcoin-build
+  - pmienk/libbitcoin-database
+  - pmienk/libbitcoin-network
+  - pmienk/libbitcoin-node
+  - pmienk/libbitcoin-system
   - pool2win/braidpool
   - pool2win/p2pool
   - praveenperera/kube_viewer
+  - purpleKarrot/cmake-discover-tests
   - raspiblitz/raspiblitz
   - rawBit-io/rawbit
   - renepickhardt/Maximum-Expected-Value-Flows-For-Redundant-Overpayments
@@ -99,11 +165,18 @@ repos:
   - selfcustody/krux
   - selfcustody/krux-installer
   - setavenger/blindbit-oracle
+  - Sjors/bitcoin
   - skot/bitaxe
   - SovranBitcoin/Sovran
   - stackernews/stacker.news
   - stratum-mining/benchmarking-tool
   - stratum-mining/stratum
+  - stratum-mining/stratum-fuzzing-corpus
+  - stratum-mining/stratumprotocol.org
+  - stratum-mining/sv2-apps
+  - stratum-mining/sv2-spec
+  - stratum-mining/sv2-ui
+  - stratum-mining/sv2-wizard
   - swift-bitcoin/swift-bitcoin
   - tallyforge/bitcoinfees
   - toneloc/stable-channels
