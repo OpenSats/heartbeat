@@ -192,7 +192,7 @@ export function FilterBar({
           <img
             src={markUrl}
             alt=""
-            className="h-7 w-7 shrink-0 [filter:brightness(0)_invert(1)]"
+            className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]"
           />
           <h1 className="text-zinc-100 text-base font-medium">heartbeat</h1>
         </button>
