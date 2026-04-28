@@ -40,7 +40,7 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
   const time = event.timestamp.slice(11, 16);
   const repoShort = event.repo.split('/').pop() ?? event.repo;
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 py-0.5 px-2 text-sm leading-6 hover:bg-zinc-900/60">
+    <div className="flex flex-wrap items-baseline gap-x-3 py-1 sm:py-0.5 px-2 text-sm leading-6 hover:bg-zinc-900/60">
       <span className="text-zinc-600 tabular-nums shrink-0">{time}</span>
       <span className={`${meta.colorClass} shrink-0 w-4 text-center`} title={meta.label}>
         {meta.sigil}
