@@ -2,6 +2,12 @@ import { useMemo, useState } from 'react';
 import { EVENT_TYPES, type EventType } from '../types';
 import { EVENT_TYPE_META } from '../eventTypes';
 
+const CHIP_BASE = 'px-2 py-1 sm:py-0.5 text-xs rounded border transition';
+const CHIP_IDLE = 'border-zinc-800 bg-transparent text-zinc-500';
+const CHIP_HOVER = 'hover:text-zinc-300 hover:border-zinc-700';
+const CHIP_ACTIVE = 'border-zinc-500 bg-zinc-800 text-zinc-100';
+const CHIP_FOCUS_ACTIVE = 'focus:border-zinc-500 focus:bg-zinc-800 focus:text-zinc-100';
+
 type Props = {
   repos: string[];
   funds: Record<string, string[]>;
@@ -27,29 +33,53 @@ function Chip({
   onClick,
   children,
   title,
-  colorClass,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   title?: string;
-  colorClass?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className={[
-        'px-2 py-1 sm:py-0.5 text-xs rounded border transition',
-        active
-          ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-          : 'border-zinc-800 bg-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700',
-        colorClass ?? '',
-      ].join(' ')}
+      className={`${CHIP_BASE} ${active ? CHIP_ACTIVE : `${CHIP_IDLE} ${CHIP_HOVER}`}`}
     >
       {children}
     </button>
+  );
+}
+
+function ClearButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
+    >
+      clear
+    </button>
+  );
+}
+
+function ChipRow({
+  label,
+  onClear,
+  className,
+  children,
+}: {
+  label: string;
+  onClear?: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
+      <span className="text-zinc-600 text-xs mr-1">{label}</span>
+      {children}
+      {onClear && <ClearButton onClick={onClear} />}
+    </div>
   );
 }
 
@@ -100,25 +130,14 @@ export function FilterBar({
     if (list.length === 0) {
       return <span className="text-xs text-zinc-600">no matching repos</span>;
     }
-    return (
-      <>
-        {list.map((r) => (
-          <Chip key={r} active={isRepoActive(r)} onClick={() => onToggleRepo(r)} title={r}>
-            {label(r)}
-          </Chip>
-        ))}
-        {selectedRepos != null && (
-          <button
-            type="button"
-            onClick={onClearRepos}
-            className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
-          >
-            clear
-          </button>
-        )}
-      </>
-    );
+    return list.map((r) => (
+      <Chip key={r} active={isRepoActive(r)} onClick={() => onToggleRepo(r)} title={r}>
+        {label(r)}
+      </Chip>
+    ));
   };
+
+  const repoClearIfActive = selectedRepos != null ? onClearRepos : undefined;
 
   const filterRowContent = (
     <>
@@ -132,25 +151,12 @@ export function FilterBar({
         autoCorrect="off"
         autoCapitalize="off"
         className={[
-          'px-2 py-1 sm:py-0.5 text-xs rounded border transition',
+          CHIP_BASE,
           'min-w-0 flex-1 max-w-40 placeholder:text-zinc-600 focus:outline-none',
-          'border-zinc-800 bg-transparent text-zinc-500',
-          'hover:text-zinc-300 hover:border-zinc-700',
-          'focus:border-zinc-500 focus:bg-zinc-800 focus:text-zinc-100',
-          repoQuery && 'border-zinc-500 bg-zinc-800 text-zinc-100',
-        ]
-          .filter(Boolean)
-          .join(' ')}
+          repoQuery ? CHIP_ACTIVE : `${CHIP_IDLE} ${CHIP_HOVER} ${CHIP_FOCUS_ACTIVE}`,
+        ].join(' ')}
       />
-      {repoQuery && (
-        <button
-          type="button"
-          onClick={() => setRepoQuery('')}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-        >
-          clear
-        </button>
-      )}
+      {repoQuery && <ClearButton onClick={() => setRepoQuery('')} />}
     </>
   );
 
@@ -182,23 +188,13 @@ export function FilterBar({
       </div>
 
       {fundNames.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-zinc-600 text-xs mr-1">fund:</span>
+        <ChipRow label="fund:" onClear={selectedFunds != null ? onClearFunds : undefined}>
           {fundNames.map((f) => (
             <Chip key={f} active={isFundActive(f)} onClick={() => onToggleFund(f)}>
               {f}
             </Chip>
           ))}
-          {selectedFunds != null && (
-            <button
-              type="button"
-              onClick={onClearFunds}
-              className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
-            >
-              clear
-            </button>
-          )}
-        </div>
+        </ChipRow>
       )}
 
       <details
@@ -214,19 +210,18 @@ export function FilterBar({
         </summary>
         <div className="flex flex-wrap items-center gap-1.5 pt-2">
           {renderRepoChips(filteredRepos, (r) => r.split('/').pop() ?? r)}
+          {repoClearIfActive && <ClearButton onClick={repoClearIfActive} />}
         </div>
         <div className="flex items-center gap-1.5 pt-2">{filterRowContent}</div>
       </details>
 
-      <div className="hidden sm:flex flex-wrap items-center gap-1.5">
-        <span className="text-zinc-600 text-xs mr-1">repos:</span>
+      <ChipRow label="repos:" onClear={repoClearIfActive} className="hidden sm:flex">
         {renderRepoChips(filteredRepos, (r) => r)}
-      </div>
+      </ChipRow>
 
       <div className="hidden sm:flex items-center gap-1.5">{filterRowContent}</div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-zinc-600 text-xs mr-1">types:</span>
+      <ChipRow label="types:" onClear={selectedTypes != null ? onClearTypes : undefined}>
         {EVENT_TYPES.map((t: EventType) => {
           const meta = EVENT_TYPE_META[t];
           return (
@@ -241,16 +236,7 @@ export function FilterBar({
             </Chip>
           );
         })}
-        {selectedTypes != null && (
-          <button
-            type="button"
-            onClick={onClearTypes}
-            className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
-          >
-            clear
-          </button>
-        )}
-      </div>
+      </ChipRow>
     </div>
   );
 }
