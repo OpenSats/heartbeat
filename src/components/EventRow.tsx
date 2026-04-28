@@ -1,9 +1,13 @@
 import type { Event } from '../types';
 import { EVENT_TYPE_META } from '../eventTypes';
 
-type Props = { event: Event; onSelectRepo?: (repo: string) => void };
+type Props = {
+  event: Event;
+  onSelectRepo?: (repo: string) => void;
+  onSelectActor?: (actor: string) => void;
+};
 
-export function EventRow({ event, onSelectRepo }: Props) {
+export function EventRow({ event, onSelectRepo, onSelectActor }: Props) {
   const meta = EVENT_TYPE_META[event.type];
   const time = event.timestamp.slice(11, 16);
   const repoShort = event.repo.split('/').pop() ?? event.repo;
@@ -25,12 +29,14 @@ export function EventRow({ event, onSelectRepo }: Props) {
         <span className="sm:hidden">{repoShort}</span>
         <span className="hidden sm:inline">{event.repo}</span>
       </button>
-      <span
-        className="hidden sm:inline text-emerald-300/80 shrink-0 truncate max-w-[10rem]"
-        title={event.actor}
+      <button
+        type="button"
+        onClick={() => onSelectActor?.(event.actor)}
+        className="hidden sm:inline text-emerald-300/80 hover:text-emerald-200 transition-colors shrink-0 truncate max-w-[10rem] text-left cursor-pointer"
+        title={`filter by ${event.actor}`}
       >
         {event.actor}
-      </span>
+      </button>
       <a
         href={event.url}
         target="_blank"

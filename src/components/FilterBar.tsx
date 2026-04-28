@@ -16,6 +16,7 @@ type Props = {
   fundFilter: FilterControl;
   repoFilter: FilterControl;
   typeFilter: FilterControl;
+  actorFilter: FilterControl;
 };
 
 const clearIfActive = (f: FilterControl) => (f.selected != null ? f.clear : undefined);
@@ -75,7 +76,15 @@ function ChipRow({
   );
 }
 
-export function FilterBar({ repos, funds, fundFilter, repoFilter, typeFilter }: Props) {
+export function FilterBar({
+  repos,
+  funds,
+  fundFilter,
+  repoFilter,
+  typeFilter,
+  actorFilter,
+}: Props) {
+  const selectedActors = actorFilter.selected;
   const [repoQuery, setRepoQuery] = useState('');
   const [reposExpanded, setReposExpanded] = useState(false);
 
@@ -233,6 +242,16 @@ export function FilterBar({ repos, funds, fundFilter, repoFilter, typeFilter }: 
           );
         })}
       </ChipRow>
+
+      {selectedActors && selectedActors.size > 0 && (
+        <ChipRow label="actor:" onClear={actorFilter.clear}>
+          {[...selectedActors].sort().map((a) => (
+            <Chip key={a} active onClick={() => actorFilter.toggle(a)} title={`remove ${a}`}>
+              {a}
+            </Chip>
+          ))}
+        </ChipRow>
+      )}
     </div>
   );
 }

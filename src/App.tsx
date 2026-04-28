@@ -12,6 +12,7 @@ export function App() {
   const fundFilter = useUrlSet('funds');
   const repoFilter = useUrlSet('repos');
   const typeFilter = useUrlSet('types');
+  const actorFilter = useUrlSet('actors');
 
   useEffect(() => {
     loadEvents()
@@ -34,9 +35,10 @@ export function App() {
       (e) =>
         (!fundReposUnion || fundReposUnion.has(e.repo)) &&
         inSet(repoFilter.selected, e.repo) &&
-        inSet(typeFilter.selected, e.type),
+        inSet(typeFilter.selected, e.type) &&
+        inSet(actorFilter.selected, e.actor),
     );
-  }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected]);
+  }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
 
   if (error) {
     return (
@@ -68,9 +70,14 @@ export function App() {
           fundFilter={fundFilter}
           repoFilter={repoFilter}
           typeFilter={typeFilter}
+          actorFilter={actorFilter}
         />
       </div>
-      <Timeline events={filtered} onSelectRepo={(r) => repoFilter.set(new Set([r]))} />
+      <Timeline
+        events={filtered}
+        onSelectRepo={(r) => repoFilter.set(new Set([r]))}
+        onSelectActor={(a) => actorFilter.set(new Set([a]))}
+      />
       <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900">
         last fetched {generatedLabel} - window {data.windowDays}d - {data.repos.length} repo(s)
       </footer>
