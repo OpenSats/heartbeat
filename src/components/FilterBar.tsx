@@ -219,8 +219,7 @@ export function FilterBar({
       <div className="flex items-center gap-1.5">{filterRowContent}</div>
 
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={ROW_LABEL}>repos:</span>
+        <ChipRow label="repos:" onClear={repoClearIfActive}>
           {!repoQuery && (
             <Chip
               active={false}
@@ -230,8 +229,7 @@ export function FilterBar({
               {reposExpanded ? 'hide' : repoToggleLabel}
             </Chip>
           )}
-          {repoClearIfActive && <ClearButton onClick={repoClearIfActive} />}
-        </div>
+        </ChipRow>
         {showRepoChips && (
           <div className="flex flex-wrap items-center gap-1.5 sm:max-h-[40vh] sm:overflow-y-auto">
             {renderRepoChips(filteredRepos)}
