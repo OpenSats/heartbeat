@@ -100,8 +100,21 @@ export function App() {
         />
       </div>
       <Timeline events={filtered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
-      <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900">
-        last fetched {generatedLabel} - window {data.windowDays}d - {data.repos.length} repo(s)
+      <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900 space-y-1">
+        <div>
+          last fetched {generatedLabel} - window {data.windowDays}d - {data.repos.length} repo(s)
+        </div>
+        <div>
+          repo missing?{' '}
+          <a
+            href="https://github.com/OpenSats/heartbeat"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            create a PR
+          </a>
+        </div>
       </footer>
     </div>
   );
