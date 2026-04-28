@@ -1,54 +1,27 @@
 # heartbeat
 
-A static, single-page activity dashboard for a set of GitHub repositories. It
-renders commits, pull requests, issues, and releases as a unified
-`git log --oneline`-style timeline.
+Static activity dashboard for a set of GitHub repos. Renders commits, PRs,
+issues, and releases as a `git log --oneline`-style timeline.
 
-No backend, no database. A scheduled GitHub Action queries the GitHub GraphQL
-API at build time and bakes the results into a static JSON file that ships
-with the site.
+A GitHub Action fetches data via the GitHub GraphQL API at build time and
+writes `public/data/events.json`. The browser never talks to GitHub directly,
+so visitors don't burn any rate-limit budget.
 
-## How it works
+## Develop
 
-```
-repos.*.yml -> scripts/fetch.ts -> public/data/events.json -> Vite build -> Vercel
-                   (Action cron)
-```
-
-- One or more `repos.yml` / `repos.<group>.yml` files at the project root list
-  the repos you want to track. The fetcher loads every file matching
-  `repos*.yml`, merges them, and deduplicates.
-- `scripts/fetch.ts` runs in CI, queries one GraphQL request per repo, and
-  normalizes commits / PRs / issues / releases into a flat `Event[]`.
-- The React app (`src/`) loads that JSON and renders it.
-
-The browser never talks to GitHub directly, so visitors don't consume any
-rate-limit budget and no token ever ships to the client.
-
-## Local development
-
-Requirements: Node 22+.
+Requires Node 22+.
 
 ```bash
 npm install
-
-export GITHUB_TOKEN=ghp_yourtoken   # any classic or fine-grained PAT works
-npm run fetch                       # populates public/data/events.json
-npm run dev                         # http://localhost:5173
+export GITHUB_TOKEN=ghp_yourtoken   # any PAT; no scopes needed for public repos
+npm run fetch                       # writes public/data/events.json
+npm run dev
 ```
 
-A PAT with no extra scopes is enough for public repos. For private repos,
-grant the `repo` scope.
+## Configure
 
-Other scripts:
-
-- `npm run build` - production build into `dist/`
-- `npm run preview` - serve the built site locally
-- `npm run typecheck` - TypeScript only
-
-## Configuration
-
-Each tracked-repo file lives at the project root and looks like this:
+Each `repos*.yml` file at the project root lists tracked repos; all matching
+files are merged and deduplicated.
 
 ```yaml
 repos:
@@ -56,66 +29,12 @@ repos:
   - owner/repo-2
 ```
 
-You can keep everything in a single `repos.yml`, or split the list into
-groups by filename: any file matching `repos*.yml` is loaded, e.g.
-`repos.bitcoin.yml`, `repos.nostr.yml`, `repos.opensats.yml`. The fetcher
-merges them and deduplicates.
+Knobs (time window, page sizes) live at the top of
+[`scripts/fetch.ts`](scripts/fetch.ts).
 
-The fetcher is configured at the top of `scripts/fetch.ts`:
+## Deploy
 
-| Constant            | Default | Meaning                              |
-| ------------------- | ------- | ------------------------------------ |
-| `WINDOW_DAYS`       | 90      | Discard events older than this.      |
-| `COMMITS_PER_REPO`  | 100     | Latest commits on the default branch |
-| `PRS_PER_REPO`      | 50      | Latest PRs by `updatedAt`            |
-| `ISSUES_PER_REPO`   | 50      | Latest issues by `updatedAt`         |
-| `RELEASES_PER_REPO` | 20      | Latest releases by `createdAt`       |
-
-## Deploying to Vercel
-
-1. Import the repo into Vercel. Framework preset: **Vite** (auto-detected).
-2. Add an environment variable `GITHUB_TOKEN` with a PAT that can read your
-   tracked repos (no extra scopes needed for public-only).
-3. Deploy. Vercel runs the `vercel-build` script
-   (`npm run fetch && npm run build`), so the JSON is generated fresh in
-   each build.
-
-Vercel rebuilds automatically on every push to `master`. For periodic
-refreshes without code changes, create a _Deploy Hook_ in _Project
-Settings > Git_, save its URL as a `VERCEL_DEPLOY_HOOK_URL` repo secret,
-and the included [`refresh.yml`](.github/workflows/refresh.yml) workflow
-will `POST` to it every 6 hours.
-
-## Adding a new event type
-
-The data shape is the single source of truth, so adding a type touches three
-small files:
-
-1. Add the new variant to `EVENT_TYPES` in [`src/types.ts`](src/types.ts).
-2. Add a metadata entry to `EVENT_TYPE_META` in
-   [`src/eventTypes.ts`](src/eventTypes.ts) (label, sigil, Tailwind color).
-3. In [`scripts/fetch.ts`](scripts/fetch.ts), extend the GraphQL query and
-   add a mapper that emits an `Event` with the new `type`.
-
-The UI picks up the new type automatically.
-
-## Layout
-
-```
-heartbeat/
-  repos*.yml                      # tracked repos (one or many groups)
-  scripts/fetch.ts                # build-time fetcher
-  src/
-    types.ts                      # Event + Dataset zod schemas
-    eventTypes.ts                 # per-type label/sigil/color
-    App.tsx
-    components/
-      Timeline.tsx
-      EventRow.tsx
-      FilterBar.tsx
-    lib/
-      loadEvents.ts
-      useUrlSet.ts
-  public/data/events.json         # generated; placeholder committed
-  .github/workflows/deploy.yml
-```
+Built for Vercel. Set `GITHUB_TOKEN` as an env var; `vercel-build` runs
+`npm run fetch && npm run build`. For periodic refreshes, save a Vercel
+Deploy Hook URL as the `VERCEL_DEPLOY_HOOK_URL` repo secret and the included
+[`refresh.yml`](.github/workflows/refresh.yml) workflow pings it every 6 hours.
