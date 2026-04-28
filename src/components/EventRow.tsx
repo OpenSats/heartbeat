@@ -45,7 +45,9 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       <span className={`${meta.colorClass} shrink-0 w-4 text-center`} title={meta.label}>
         {meta.sigil}
       </span>
-      <span className={`${meta.colorClass} shrink-0 tabular-nums truncate max-w-[8rem]`}>
+      <span
+        className={`${meta.colorClass} shrink-0 tabular-nums truncate max-w-[8rem] ${event.type === 'commit' ? 'hidden sm:inline' : ''}`}
+      >
         {event.shortId}
       </span>
       <FilterButton
