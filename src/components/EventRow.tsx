@@ -61,7 +61,7 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       <FilterButton
         value={event.actor}
         onSelect={onSelectActor}
-        className="hidden sm:inline text-emerald-300/80 hover:text-emerald-200 shrink-0 max-w-[10rem]"
+        className="text-emerald-300/80 hover:text-emerald-200 shrink-0 max-w-[8rem] sm:max-w-[10rem]"
       >
         {event.actor}
       </FilterButton>
