@@ -33,7 +33,7 @@ export function Timeline({ events, onSelectRepo, onSelectActor }: Props) {
     <div className="pb-12">
       {groups.map(([day, dayEvents]) => (
         <section key={day}>
-          <div className="sticky top-0 bg-zinc-950/95 backdrop-blur px-2 py-1 text-zinc-500 text-xs border-b border-zinc-900">
+          <div className="sticky top-0 sm:top-(--filter-bar-h) bg-zinc-950/95 backdrop-blur px-2 py-1 text-zinc-500 text-xs border-b border-zinc-900">
             {`---- ${day} ----`}
             <span className="ml-2 text-zinc-700">{dayEvents.length}</span>
           </div>

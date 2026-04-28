@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadEvents } from './lib/loadEvents';
 import { useUrlSet } from './lib/useUrlSet';
 import { Timeline } from './components/Timeline';
@@ -19,6 +19,21 @@ export function App() {
       .then(setData)
       .catch((err) => setError((err as Error).message));
   }, []);
+
+  // Track the filter bar's height so day headers in the Timeline can
+  // stick just below it on desktop instead of being hidden behind it.
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = filterBarRef.current;
+    if (!el) return;
+    const update = () => {
+      document.documentElement.style.setProperty('--filter-bar-h', `${el.offsetHeight}px`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
 
   const fundReposUnion = useMemo(() => {
     const sel = fundFilter.selected;
@@ -74,7 +89,7 @@ export function App() {
 
   return (
     <div className="min-h-full">
-      <div className="sm:sticky sm:top-0 z-10">
+      <div ref={filterBarRef} className="sm:sticky sm:top-0 z-10">
         <FilterBar
           repos={data.repos}
           funds={data.funds}
