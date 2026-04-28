@@ -59,6 +59,29 @@ export function FilterBar({
 }: Props) {
   const isRepoActive = (r: string) => selectedRepos != null && selectedRepos.has(r);
   const isTypeActive = (t: string) => selectedTypes != null && selectedTypes.has(t);
+  const repoCountLabel =
+    selectedRepos != null && selectedRepos.size > 0
+      ? `${selectedRepos.size} of ${repos.length} active`
+      : `${repos.length}`;
+
+  const renderRepoChips = (label: (r: string) => string) => (
+    <>
+      {repos.map((r) => (
+        <Chip key={r} active={isRepoActive(r)} onClick={() => onToggleRepo(r)} title={r}>
+          {label(r)}
+        </Chip>
+      ))}
+      {selectedRepos != null && (
+        <button
+          type="button"
+          onClick={onClearRepos}
+          className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
+        >
+          clear
+        </button>
+      )}
+    </>
+  );
 
   return (
     <div className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur px-3 py-2 space-y-2">
@@ -69,22 +92,21 @@ export function FilterBar({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <details className="group sm:hidden">
+        <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer select-none flex items-center gap-1.5 text-xs text-zinc-500">
+          <span className="text-zinc-600 inline-block transition-transform group-[&[open]]:rotate-90">
+            {'\u25B8'}
+          </span>
+          <span>repos &middot; {repoCountLabel}</span>
+        </summary>
+        <div className="flex flex-wrap items-center gap-1.5 pt-2">
+          {renderRepoChips((r) => r.split('/').pop() ?? r)}
+        </div>
+      </details>
+
+      <div className="hidden sm:flex flex-wrap items-center gap-1.5">
         <span className="text-zinc-600 text-xs mr-1">repos:</span>
-        {repos.map((r) => (
-          <Chip key={r} active={isRepoActive(r)} onClick={() => onToggleRepo(r)}>
-            {r}
-          </Chip>
-        ))}
-        {selectedRepos != null && (
-          <button
-            type="button"
-            onClick={onClearRepos}
-            className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
-          >
-            clear
-          </button>
-        )}
+        {renderRepoChips((r) => r)}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
