@@ -7,6 +7,9 @@ A GitHub Action fetches data via the GitHub GraphQL API at build time and
 writes `public/data/events.json`. The browser never talks to GitHub directly,
 so visitors don't burn any rate-limit budget.
 
+Today only GitHub is wired up. The plan is to also pull from Gitea, GitLab,
+and nostr-native hosts like [gitworkshop.dev](https://gitworkshop.dev/).
+
 ## Develop
 
 Requires Node 22+.
