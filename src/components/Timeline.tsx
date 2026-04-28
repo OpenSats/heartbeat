@@ -22,11 +22,7 @@ export function Timeline({ events }: Props) {
   const groups = useMemo(() => groupByDay(events), [events]);
 
   if (events.length === 0) {
-    return (
-      <div className="text-zinc-500 px-2 py-8">
-        No events match the current filters.
-      </div>
-    );
+    return <div className="text-zinc-500 px-2 py-8">No events match the current filters.</div>;
   }
 
   return (

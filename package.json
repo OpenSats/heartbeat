@@ -10,7 +10,10 @@
     "vercel-build": "npm run fetch && npm run build",
     "preview": "vite preview",
     "fetch": "tsx scripts/fetch.ts",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "react": "^19.2.5",
@@ -18,6 +21,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@octokit/graphql": "^9.0.3",
     "@tailwindcss/vite": "^4.2.4",
     "@types/js-yaml": "^4.0.9",
@@ -25,10 +29,17 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0",
     "js-yaml": "^4.1.1",
+    "prettier": "^3.8.3",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1",
     "vite": "^8.0.10"
   }
 }

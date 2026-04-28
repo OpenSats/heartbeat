@@ -69,7 +69,14 @@ type RepoQueryResult = {
 };
 
 const REPO_QUERY = /* GraphQL */ `
-  query Repo($owner: String!, $name: String!, $commits: Int!, $prs: Int!, $issues: Int!, $releases: Int!) {
+  query Repo(
+    $owner: String!
+    $name: String!
+    $commits: Int!
+    $prs: Int!
+    $issues: Int!
+    $releases: Int!
+  ) {
     repository(owner: $owner, name: $name) {
       nameWithOwner
       defaultBranchRef {
@@ -82,7 +89,12 @@ const REPO_QUERY = /* GraphQL */ `
                 committedDate
                 messageHeadline
                 url
-                author { name user { login } }
+                author {
+                  name
+                  user {
+                    login
+                  }
+                }
               }
             }
           }
@@ -97,8 +109,12 @@ const REPO_QUERY = /* GraphQL */ `
           mergedAt
           closedAt
           merged
-          author { login }
-          mergedBy { login }
+          author {
+            login
+          }
+          mergedBy {
+            login
+          }
         }
       }
       issues(first: $issues, orderBy: { field: UPDATED_AT, direction: DESC }) {
@@ -108,7 +124,9 @@ const REPO_QUERY = /* GraphQL */ `
           url
           createdAt
           closedAt
-          author { login }
+          author {
+            login
+          }
         }
       }
       releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) {
@@ -118,7 +136,9 @@ const REPO_QUERY = /* GraphQL */ `
           url
           publishedAt
           createdAt
-          author { login }
+          author {
+            login
+          }
         }
       }
     }
@@ -167,14 +187,43 @@ function commitToEvents(repo: string, n: CommitNode): Event[] {
 function prToEvents(repo: string, n: PrNode): Event[] {
   const short = `#${n.number}`;
   const out: Event[] = [
-    makeEvent(repo, 'pr_opened', String(n.number), n.createdAt, login(n.author), n.title, n.url, short),
+    makeEvent(
+      repo,
+      'pr_opened',
+      String(n.number),
+      n.createdAt,
+      login(n.author),
+      n.title,
+      n.url,
+      short,
+    ),
   ];
   if (n.merged && n.mergedAt) {
     out.push(
-      makeEvent(repo, 'pr_merged', String(n.number), n.mergedAt, login(n.mergedBy ?? n.author), n.title, n.url, short),
+      makeEvent(
+        repo,
+        'pr_merged',
+        String(n.number),
+        n.mergedAt,
+        login(n.mergedBy ?? n.author),
+        n.title,
+        n.url,
+        short,
+      ),
     );
   } else if (n.closedAt) {
-    out.push(makeEvent(repo, 'pr_closed', String(n.number), n.closedAt, login(n.author), n.title, n.url, short));
+    out.push(
+      makeEvent(
+        repo,
+        'pr_closed',
+        String(n.number),
+        n.closedAt,
+        login(n.author),
+        n.title,
+        n.url,
+        short,
+      ),
+    );
   }
   return out;
 }
@@ -182,10 +231,30 @@ function prToEvents(repo: string, n: PrNode): Event[] {
 function issueToEvents(repo: string, n: IssueNode): Event[] {
   const short = `#${n.number}`;
   const out: Event[] = [
-    makeEvent(repo, 'issue_opened', String(n.number), n.createdAt, login(n.author), n.title, n.url, short),
+    makeEvent(
+      repo,
+      'issue_opened',
+      String(n.number),
+      n.createdAt,
+      login(n.author),
+      n.title,
+      n.url,
+      short,
+    ),
   ];
   if (n.closedAt) {
-    out.push(makeEvent(repo, 'issue_closed', String(n.number), n.closedAt, login(n.author), n.title, n.url, short));
+    out.push(
+      makeEvent(
+        repo,
+        'issue_closed',
+        String(n.number),
+        n.closedAt,
+        login(n.author),
+        n.title,
+        n.url,
+        short,
+      ),
+    );
   }
   return out;
 }
@@ -193,7 +262,16 @@ function issueToEvents(repo: string, n: IssueNode): Event[] {
 function releaseToEvents(repo: string, n: ReleaseNode): Event[] {
   const ts = n.publishedAt ?? n.createdAt;
   return [
-    makeEvent(repo, 'release', n.tagName, ts, login(n.author), n.name ?? n.tagName, n.url, n.tagName),
+    makeEvent(
+      repo,
+      'release',
+      n.tagName,
+      ts,
+      login(n.author),
+      n.name ?? n.tagName,
+      n.url,
+      n.tagName,
+    ),
   ];
 }
 
@@ -211,10 +289,7 @@ function getToken(): string {
   return token;
 }
 
-async function fetchRepo(
-  client: typeof graphql,
-  ownerName: string,
-): Promise<Event[]> {
+async function fetchRepo(client: typeof graphql, ownerName: string): Promise<Event[]> {
   const [owner, name] = ownerName.split('/');
   const data = await client<RepoQueryResult>(REPO_QUERY, {
     owner,

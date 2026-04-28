@@ -1,0 +1,5 @@
+node_modules
+dist
+public/data
+package-lock.json
+*.tsbuildinfo

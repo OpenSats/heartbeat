@@ -74,8 +74,8 @@ The fetcher is configured at the top of `scripts/fetch.ts`:
    each build.
 
 Vercel rebuilds automatically on every push to `master`. For periodic
-refreshes without code changes, create a *Deploy Hook* in *Project
-Settings > Git*, save its URL as a `VERCEL_DEPLOY_HOOK_URL` repo secret,
+refreshes without code changes, create a _Deploy Hook_ in _Project
+Settings > Git_, save its URL as a `VERCEL_DEPLOY_HOOK_URL` repo secret,
 and the included [`refresh.yml`](.github/workflows/refresh.yml) workflow
 will `POST` to it every 6 hours.
 

@@ -20,7 +20,9 @@ function writeParam(key: string, value: Set<string> | null): void {
  * URL-backed multi-select. `null` means "no filter" (param absent).
  * An empty Set means "filter is active but nothing selected".
  */
-export function useUrlSet(key: string): [Set<string> | null, (next: Set<string> | null) => void, (value: string) => void] {
+export function useUrlSet(
+  key: string,
+): [Set<string> | null, (next: Set<string> | null) => void, (value: string) => void] {
   const [state, setState] = useState<Set<string> | null>(() => readParam(key));
 
   useEffect(() => {

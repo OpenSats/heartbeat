@@ -13,7 +13,9 @@ export function App() {
   const [selectedTypes, setSelectedTypes, toggleType] = useUrlSet('types');
 
   useEffect(() => {
-    loadEvents().then(setData).catch((err) => setError((err as Error).message));
+    loadEvents()
+      .then(setData)
+      .catch((err) => setError((err as Error).message));
   }, []);
 
   const filtered = useMemo(() => {
