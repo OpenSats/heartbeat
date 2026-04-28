@@ -179,22 +179,32 @@ export function FilterBar({
 
   const markUrl = `${import.meta.env.BASE_URL}opensats-mark.svg`;
 
+  const clearAll = () => {
+    fundFilter.clear();
+    repoFilter.clear();
+    typeFilter.clear();
+    actorFilter.clear();
+    setRepoQuery('');
+    setReposExpanded(false);
+  };
+
   return (
     <div className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur px-3 py-2 space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1">
-          <a
-            href="https://opensats.org"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="shrink-0 transition-opacity hover:opacity-80"
-            title="An OpenSats project"
-            aria-label="OpenSats"
-          >
-            <img src={markUrl} alt="" className="h-7 w-7 [filter:brightness(0)_invert(1)]" />
-          </a>
+        <button
+          type="button"
+          onClick={clearAll}
+          className="flex items-center gap-1 cursor-pointer transition-opacity hover:opacity-80"
+          title="reset all filters"
+          aria-label="reset all filters"
+        >
+          <img
+            src={markUrl}
+            alt=""
+            className="h-7 w-7 shrink-0 [filter:brightness(0)_invert(1)]"
+          />
           <h1 className="text-zinc-100 text-base font-medium">heartbeat</h1>
-        </div>
+        </button>
         <a
           href="https://opensats.org"
           target="_blank"
