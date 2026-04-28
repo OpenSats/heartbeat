@@ -178,11 +178,7 @@ export function FilterBar({
             title="An OpenSats project"
             aria-label="OpenSats"
           >
-            <img
-              src={markUrl}
-              alt=""
-              className="h-7 w-7 [filter:brightness(0)_invert(1)]"
-            />
+            <img src={markUrl} alt="" className="h-7 w-7 [filter:brightness(0)_invert(1)]" />
           </a>
           <h1 className="text-zinc-100 text-base font-medium">heartbeat</h1>
         </div>
