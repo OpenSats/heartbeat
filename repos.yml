@@ -1,0 +1,7 @@
+# List the GitHub repositories you want Heartbeat to track.
+# Each entry is "owner/name". Public repos work with the default
+# GITHUB_TOKEN; private repos require a PAT with `repo` scope.
+repos:
+  - facebook/react
+  - vitejs/vite
+  - tailwindlabs/tailwindcss
