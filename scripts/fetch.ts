@@ -1,4 +1,4 @@
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { graphql } from '@octokit/graphql';
@@ -19,7 +19,7 @@ const ISSUES_PER_REPO = 50;
 const RELEASES_PER_REPO = 20;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CONFIG_PATH = resolve(ROOT, 'repos.yml');
+const CONFIG_FILE_PATTERN = /^repos(\..+)?\.ya?ml$/i;
 const OUT_PATH = resolve(ROOT, 'public/data/events.json');
 
 type Actor = { login: string } | null;
@@ -276,9 +276,18 @@ function releaseToEvents(repo: string, n: ReleaseNode): Event[] {
 }
 
 async function loadConfig(): Promise<Config> {
-  const raw = await readFile(CONFIG_PATH, 'utf8');
-  const parsed = yaml.load(raw);
-  return ConfigSchema.parse(parsed);
+  const files = (await readdir(ROOT)).filter((f) => CONFIG_FILE_PATTERN.test(f)).sort();
+  if (files.length === 0) {
+    throw new Error('No repos.yml or repos.<group>.yml files found at the project root.');
+  }
+  const all = new Set<string>();
+  for (const file of files) {
+    const raw = await readFile(resolve(ROOT, file), 'utf8');
+    const parsed = ConfigSchema.parse(yaml.load(raw));
+    console.log(`  ${file}: ${parsed.repos.length} repos`);
+    for (const r of parsed.repos) all.add(r);
+  }
+  return { repos: [...all].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())) };
 }
 
 function getToken(): string {

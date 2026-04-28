@@ -11,11 +11,13 @@ with the site.
 ## How it works
 
 ```
-repos.yml -> scripts/fetch.ts -> public/data/events.json -> Vite build -> GitHub Pages
-                  (Action cron)
+repos.*.yml -> scripts/fetch.ts -> public/data/events.json -> Vite build -> Vercel
+                   (Action cron)
 ```
 
-- `repos.yml` lists the repos you want to track.
+- One or more `repos.yml` / `repos.<group>.yml` files at the project root list
+  the repos you want to track. The fetcher loads every file matching
+  `repos*.yml`, merges them, and deduplicates.
 - `scripts/fetch.ts` runs in CI, queries one GraphQL request per repo, and
   normalizes commits / PRs / issues / releases into a flat `Event[]`.
 - The React app (`src/`) loads that JSON and renders it.
@@ -46,13 +48,18 @@ Other scripts:
 
 ## Configuration
 
-Edit `repos.yml`:
+Each tracked-repo file lives at the project root and looks like this:
 
 ```yaml
 repos:
   - owner/repo-1
   - owner/repo-2
 ```
+
+You can keep everything in a single `repos.yml`, or split the list into
+groups by filename: any file matching `repos*.yml` is loaded, e.g.
+`repos.bitcoin.yml`, `repos.nostr.yml`, `repos.opensats.yml`. The fetcher
+merges them and deduplicates.
 
 The fetcher is configured at the top of `scripts/fetch.ts`:
 
@@ -96,7 +103,7 @@ The UI picks up the new type automatically.
 
 ```
 heartbeat/
-  repos.yml                       # tracked repos
+  repos*.yml                      # tracked repos (one or many groups)
   scripts/fetch.ts                # build-time fetcher
   src/
     types.ts                      # Event + Dataset zod schemas
