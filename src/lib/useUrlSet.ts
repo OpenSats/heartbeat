@@ -20,6 +20,8 @@ function writeParam(key: string, value: Set<string> | null): void {
 export type FilterControl = {
   /** Selected values, or null when the URL param is absent (no filter). */
   selected: Set<string> | null;
+  /** Replace the entire selection (pass null to drop the URL param). */
+  set: (next: Set<string> | null) => void;
   /** Toggle a value's presence in the set. */
   toggle: (value: string) => void;
   /** Drop the URL param entirely. */
@@ -40,6 +42,14 @@ export function useUrlSet(key: string): FilterControl {
     return () => window.removeEventListener('popstate', onPop);
   }, [key]);
 
+  const set = useCallback(
+    (next: Set<string> | null) => {
+      writeParam(key, next);
+      setSelected(next);
+    },
+    [key],
+  );
+
   const toggle = useCallback(
     (value: string) => {
       setSelected((prev) => {
@@ -59,5 +69,5 @@ export function useUrlSet(key: string): FilterControl {
     setSelected(null);
   }, [key]);
 
-  return { selected, toggle, clear };
+  return { selected, set, toggle, clear };
 }

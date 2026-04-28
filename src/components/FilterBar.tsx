@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EVENT_TYPES, type EventType } from '../types';
 import { EVENT_TYPE_META } from '../eventTypes';
 import type { FilterControl } from '../lib/useUrlSet';
@@ -107,6 +107,22 @@ export function FilterBar({
   }, [repos, funds, fundFilter.selected, repoQuery]);
 
   const showRepoChips = reposExpanded || repoQuery.length > 0;
+
+  // Typing in the filter auto-selects matching repos; clearing the
+  // input drops the param so the timeline returns to all repos. We
+  // ignore the empty->empty case so URL-bound selections survive
+  // first render.
+  const { set: setRepoSelection } = repoFilter;
+  const prevQueryRef = useRef(repoQuery);
+  useEffect(() => {
+    const prev = prevQueryRef.current;
+    prevQueryRef.current = repoQuery;
+    if (repoQuery.length === 0) {
+      if (prev.length > 0) setRepoSelection(null);
+      return;
+    }
+    setRepoSelection(new Set(filteredRepos));
+  }, [repoQuery, filteredRepos, setRepoSelection]);
 
   const renderRepoChips = (list: string[]) => {
     if (list.length === 0) {
