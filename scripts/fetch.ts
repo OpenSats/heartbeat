@@ -6,6 +6,7 @@ import yaml from 'js-yaml';
 import {
   ConfigSchema,
   DatasetSchema,
+  ProfilesConfigSchema,
   type Dataset,
   type Event,
   type EventType,
@@ -21,9 +22,13 @@ const COMMITS_PER_REPO = 100;
 const PRS_PER_REPO = 50;
 const ISSUES_PER_REPO = 50;
 const RELEASES_PER_REPO = 20;
+const TOP_REPOS_PER_PROFILE = 5;
+const REPO_FETCH_CONCURRENCY = 8;
+const PROFILE_FETCH_CONCURRENCY = 10;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_FILE_PATTERN = /^repos(\..+)?\.ya?ml$/i;
+const PROFILE_FILE_PATTERN = /^profiles(\..+)?\.ya?ml$/i;
 const OUT_PATH = resolve(ROOT, 'public/data/events.json');
 
 type Actor = { login: string } | null;
@@ -148,6 +153,73 @@ const REPO_QUERY = /* GraphQL */ `
     }
   }
 `;
+
+type ProfileQueryResult = {
+  repositoryOwner: {
+    repositories: {
+      nodes: Array<{
+        nameWithOwner: string;
+        isDisabled: boolean;
+        isEmpty: boolean;
+      }>;
+    };
+  } | null;
+};
+
+const PROFILE_QUERY = /* GraphQL */ `
+  query Profile($login: String!, $first: Int!) {
+    repositoryOwner(login: $login) {
+      repositories(
+        first: $first
+        orderBy: { field: PUSHED_AT, direction: DESC }
+        ownerAffiliations: OWNER
+        isFork: false
+        privacy: PUBLIC
+        isArchived: false
+      ) {
+        nodes {
+          nameWithOwner
+          isDisabled
+          isEmpty
+        }
+      }
+    }
+  }
+`;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+async function fetchProfileRepos(
+  client: typeof graphql,
+  login: string,
+  n: number,
+): Promise<string[]> {
+  const data = await client<ProfileQueryResult>(PROFILE_QUERY, {
+    login,
+    first: n + 5,
+  });
+  const owner = data.repositoryOwner;
+  if (!owner) return [];
+  return owner.repositories.nodes
+    .filter((r) => !r.isDisabled && !r.isEmpty)
+    .slice(0, n)
+    .map((r) => r.nameWithOwner);
+}
 
 function makeEvent(
   repo: string,
@@ -280,38 +352,66 @@ function releaseToEvents(repo: string, n: ReleaseNode): Event[] {
 }
 
 function fundFromFilename(file: string): string {
-  const m = file.match(/^repos\.(.+)\.ya?ml$/i);
-  if (!m) return 'General';
-  const slug = m[1];
-  return slug.charAt(0).toUpperCase() + slug.slice(1);
+  const m = file.match(/^(?:repos|profiles)\.(.+)\.ya?ml$/i);
+  return m ? m[1] : 'general';
 }
 
-async function loadConfig(): Promise<LoadedConfig> {
-  const files = (await readdir(ROOT)).filter((f) => CONFIG_FILE_PATTERN.test(f)).sort();
-  if (files.length === 0) {
-    throw new Error('No repos.yml or repos.<group>.yml files found at the project root.');
+const sortByName = (a: string, b: string) => a.toLowerCase().localeCompare(b.toLowerCase());
+
+async function loadConfig(client: typeof graphql): Promise<LoadedConfig> {
+  const allFiles = await readdir(ROOT);
+  const repoFiles = allFiles.filter((f) => CONFIG_FILE_PATTERN.test(f)).sort();
+  const profileFiles = allFiles.filter((f) => PROFILE_FILE_PATTERN.test(f)).sort();
+  if (repoFiles.length === 0 && profileFiles.length === 0) {
+    throw new Error('No repos.*.yml or profiles.*.yml files found at the project root.');
   }
+
   const all = new Set<string>();
   const funds: Record<string, Set<string>> = {};
-  for (const file of files) {
+  const bucket = (fund: string) => (funds[fund] ??= new Set<string>());
+  const add = (fund: string, repos: Iterable<string>) => {
+    const b = bucket(fund);
+    for (const r of repos) {
+      all.add(r);
+      b.add(r);
+    }
+  };
+
+  for (const file of repoFiles) {
     const raw = await readFile(resolve(ROOT, file), 'utf8');
     const parsed = ConfigSchema.parse(yaml.load(raw));
-    const fundName = parsed.fund ?? fundFromFilename(file);
-    console.log(`  ${file}: ${parsed.repos.length} repos -> "${fundName}"`);
-    const bucket = (funds[fundName] ??= new Set<string>());
-    for (const r of parsed.repos) {
-      all.add(r);
-      bucket.add(r);
-    }
+    const fund = parsed.fund ?? fundFromFilename(file);
+    console.log(`  ${file}: ${parsed.repos.length} repos -> "${fund}"`);
+    add(fund, parsed.repos);
   }
+
+  for (const file of profileFiles) {
+    const raw = await readFile(resolve(ROOT, file), 'utf8');
+    const parsed = ProfilesConfigSchema.parse(yaml.load(raw));
+    const fund = parsed.fund ?? fundFromFilename(file);
+    console.log(
+      `  ${file}: expanding ${parsed.profiles.length} profile(s) (top ${TOP_REPOS_PER_PROFILE}) -> "${fund}"`,
+    );
+    const before = bucket(fund).size;
+    const results = await mapWithConcurrency(
+      parsed.profiles,
+      PROFILE_FETCH_CONCURRENCY,
+      async (login) => {
+        try {
+          return await fetchProfileRepos(client, login, TOP_REPOS_PER_PROFILE);
+        } catch (err) {
+          console.warn(`    ! ${login}: ${(err as Error).message}`);
+          return [] as string[];
+        }
+      },
+    );
+    add(fund, results.flat());
+    console.log(`    -> +${bucket(fund).size - before} new repo(s) in "${fund}"`);
+  }
+
   return {
-    repos: [...all].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())),
-    funds: Object.fromEntries(
-      Object.entries(funds).map(([k, v]) => [
-        k,
-        [...v].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())),
-      ]),
-    ),
+    repos: [...all].sort(sortByName),
+    funds: Object.fromEntries(Object.entries(funds).map(([k, v]) => [k, [...v].sort(sortByName)])),
   };
 }
 
@@ -348,25 +448,30 @@ async function fetchRepo(client: typeof graphql, ownerName: string): Promise<Eve
 }
 
 async function main() {
-  const config = await loadConfig();
   const token = getToken();
   const client = graphql.defaults({ headers: { authorization: `token ${token}` } });
+
+  console.log('Loading config...');
+  const config = await loadConfig(client);
+
   const cutoff = Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  console.log(
+    `Fetching ${config.repos.length} repo(s), window=${WINDOW_DAYS}d, concurrency=${REPO_FETCH_CONCURRENCY}`,
+  );
 
-  console.log(`Fetching ${config.repos.length} repo(s), window=${WINDOW_DAYS}d`);
-
-  const all: Event[] = [];
-  for (const repo of config.repos) {
+  const fetched = await mapWithConcurrency(config.repos, REPO_FETCH_CONCURRENCY, async (repo) => {
     try {
       const events = await fetchRepo(client, repo);
       const recent = events.filter((e) => Date.parse(e.timestamp) >= cutoff);
       console.log(`  ${repo}: ${recent.length} events (of ${events.length} fetched)`);
-      all.push(...recent);
+      return recent;
     } catch (err) {
       console.error(`! ${repo}: ${(err as Error).message}`);
+      return [] as Event[];
     }
-  }
+  });
 
+  const all = fetched.flat();
   all.sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
 
   const dataset: Dataset = {

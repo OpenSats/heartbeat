@@ -39,3 +39,9 @@ export const ConfigSchema = z.object({
   repos: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/name"')),
 });
 export type Config = z.infer<typeof ConfigSchema>;
+
+export const ProfilesConfigSchema = z.object({
+  fund: z.string().optional(),
+  profiles: z.array(z.coerce.string().regex(/^[A-Za-z0-9-]+$/, 'expected a GitHub login')),
+});
+export type ProfilesConfig = z.infer<typeof ProfilesConfigSchema>;

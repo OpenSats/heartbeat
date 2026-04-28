@@ -11,8 +11,9 @@ with the site.
 ## How it works
 
 ```
-repos.*.yml -> scripts/fetch.ts -> public/data/events.json -> Vite build -> Vercel
-                   (Action cron)
+repos.*.yml      \
+profiles.*.yml    -> scripts/fetch.ts -> public/data/events.json -> Vite build -> Vercel
+                       (Action cron)
 ```
 
 - One or more `repos.yml` / `repos.<group>.yml` files at the project root list
@@ -59,17 +60,33 @@ repos:
 You can keep everything in a single `repos.yml`, or split the list into
 groups by filename: any file matching `repos*.yml` is loaded, e.g.
 `repos.bitcoin.yml`, `repos.nostr.yml`, `repos.opensats.yml`. The fetcher
-merges them and deduplicates.
+merges them and deduplicates. The fund name is taken from a `fund:` field
+in the file or, if absent, derived from the filename (`repos.nostr.yml`
+-> `nostr`).
+
+You can also list **GitHub profiles** (users or organizations) in
+`profiles.<group>.yml` files. The fetcher resolves each login to its
+`TOP_REPOS_PER_PROFILE` most-recently-pushed-to public repos and adds
+them to the same fund:
+
+```yaml
+fund: bitcoin
+profiles:
+  - 0xB10C
+  - fiatjaf
+```
 
 The fetcher is configured at the top of `scripts/fetch.ts`:
 
-| Constant            | Default | Meaning                              |
-| ------------------- | ------- | ------------------------------------ |
-| `WINDOW_DAYS`       | 90      | Discard events older than this.      |
-| `COMMITS_PER_REPO`  | 100     | Latest commits on the default branch |
-| `PRS_PER_REPO`      | 50      | Latest PRs by `updatedAt`            |
-| `ISSUES_PER_REPO`   | 50      | Latest issues by `updatedAt`         |
-| `RELEASES_PER_REPO` | 20      | Latest releases by `createdAt`       |
+| Constant                 | Default | Meaning                              |
+| ------------------------ | ------- | ------------------------------------ |
+| `WINDOW_DAYS`            | 90      | Discard events older than this.      |
+| `COMMITS_PER_REPO`       | 100     | Latest commits on the default branch |
+| `PRS_PER_REPO`           | 50      | Latest PRs by `updatedAt`            |
+| `ISSUES_PER_REPO`        | 50      | Latest issues by `updatedAt`         |
+| `RELEASES_PER_REPO`      | 20      | Latest releases by `createdAt`       |
+| `TOP_REPOS_PER_PROFILE`  | 5       | Repos pulled from each profile       |
+| `REPO_FETCH_CONCURRENCY` | 8       | Parallel repo queries                |
 
 ## Deploying to Vercel
 
