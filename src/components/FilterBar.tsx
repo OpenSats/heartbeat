@@ -202,10 +202,21 @@ export function FilterBar({
             {'\u25B8'}
           </span>
           <span>repos &middot; {repoCountLabel}</span>
+          {repoClearIfActive && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                repoClearIfActive();
+              }}
+              className="text-xs text-zinc-500 hover:text-zinc-300 ml-1"
+            >
+              clear
+            </button>
+          )}
         </summary>
-        <div className="flex flex-wrap items-center gap-1.5 pt-2">
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 sm:max-h-[40vh] sm:overflow-y-auto">
           {renderRepoChips(filteredRepos)}
-          {repoClearIfActive && <ClearButton onClick={repoClearIfActive} />}
         </div>
       </details>
 
