@@ -143,6 +143,9 @@ export function FilterBar({
   };
 
   const repoClearIfActive = clearIfActive(repoFilter);
+  const selectedRepoCount = repoFilter.selected?.size ?? 0;
+  const repoToggleLabel =
+    selectedRepoCount > 0 ? `${selectedRepoCount} selected` : `show all ${filteredRepos.length}`;
 
   const filterRowContent = (
     <>
@@ -214,7 +217,7 @@ export function FilterBar({
               onClick={() => setReposExpanded((v) => !v)}
               title={`${repos.length} repos`}
             >
-              {reposExpanded ? 'hide' : `show all ${filteredRepos.length}`}
+              {reposExpanded ? 'hide' : repoToggleLabel}
             </Chip>
           )}
           {repoClearIfActive && <ClearButton onClick={repoClearIfActive} />}
