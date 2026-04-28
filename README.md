@@ -64,20 +64,6 @@ The fetcher is configured at the top of `scripts/fetch.ts`:
 | `ISSUES_PER_REPO`   | 50      | Latest issues by `updatedAt`         |
 | `RELEASES_PER_REPO` | 20      | Latest releases by `createdAt`       |
 
-## Deploying to GitHub Pages
-
-1. Push this repo to GitHub.
-2. In *Settings > Pages*, set "Build and deployment" source to **GitHub
-   Actions**.
-3. (Optional) For private repos, create a PAT with `repo` scope and add it as
-   a repository secret named `HEARTBEAT_TOKEN`. Public-only setups can rely
-   on the auto-provided `GITHUB_TOKEN`.
-4. Push to `master` (or run the *Build & Deploy* workflow manually). It also
-   re-runs every 6 hours via cron.
-
-The site will be available at
-`https://<your-username>.github.io/<repo-name>/`.
-
 ## Deploying to Vercel
 
 1. Import the repo into Vercel. Framework preset: **Vite** (auto-detected).
@@ -87,10 +73,11 @@ The site will be available at
    (`npm run fetch && npm run build`), so the JSON is generated fresh in
    each build.
 
-Vercel rebuilds automatically on every push to `master`. To refresh the
-data on a schedule without code changes, create a *Deploy Hook* in
-*Project Settings > Git* and have any cron service (cron-job.org, a tiny
-GitHub Action, etc.) `POST` to it on whatever cadence you want.
+Vercel rebuilds automatically on every push to `master`. For periodic
+refreshes without code changes, create a *Deploy Hook* in *Project
+Settings > Git*, save its URL as a `VERCEL_DEPLOY_HOOK_URL` repo secret,
+and the included [`refresh.yml`](.github/workflows/refresh.yml) workflow
+will `POST` to it every 6 hours.
 
 ## Adding a new event type
 
