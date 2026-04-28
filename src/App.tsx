@@ -12,7 +12,7 @@ export function App() {
   const fundFilter = useUrlSet('funds');
   const repoFilter = useUrlSet('repos');
   const typeFilter = useUrlSet('types');
-  const actorFilter = useUrlSet('actors');
+  const actorFilter = useUrlSet('devs');
 
   useEffect(() => {
     loadEvents()
