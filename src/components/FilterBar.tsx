@@ -153,8 +153,6 @@ export function FilterBar({
         </span>
       </div>
 
-      {filterRow}
-
       <details
         className="group sm:hidden"
         open={mobileExpanded || repoQuery.length > 0}
@@ -175,6 +173,8 @@ export function FilterBar({
         <span className="text-zinc-600 text-xs mr-1">repos:</span>
         {renderRepoChips(filteredRepos, (r) => r)}
       </div>
+
+      {filterRow}
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-zinc-600 text-xs mr-1">types:</span>
