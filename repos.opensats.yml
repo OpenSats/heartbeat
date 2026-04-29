@@ -3,4 +3,5 @@
 # GITHUB_TOKEN; private repos require a PAT with `repo` scope.
 fund: ops
 repos:
+  - OpenSats/heartbeat
   - OpenSats/website
