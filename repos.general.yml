@@ -7,7 +7,6 @@ repos:
   - 256-Foundation/Libre-Board
   - aaron-recompile/btcaaron
   - andreasgriffin/bitcoin-safe
-  - areabitcoin/Bitcoin-4-All
   - asmap/asmap-data
   - asmap/kartograf
   - asmap/rpki-client-nix
