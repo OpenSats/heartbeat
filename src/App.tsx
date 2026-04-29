@@ -87,6 +87,23 @@ export function App() {
     ? 'never'
     : generated.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
 
+  const totals = data.events.reduce<Record<string, number>>((acc, e) => {
+    acc[e.type] = (acc[e.type] ?? 0) + 1;
+    return acc;
+  }, {});
+  const fmt = (n: number) => n.toLocaleString();
+  const statParts: string[] = [];
+  const pushStat = (n: number, singular: string, plural = singular + 's') => {
+    if (n > 0) statParts.push(`${fmt(n)} ${n === 1 ? singular : plural}`);
+  };
+  pushStat(totals.commit ?? 0, 'commit');
+  pushStat(totals.pr_opened ?? 0, 'PR opened', 'PRs opened');
+  pushStat(totals.pr_merged ?? 0, 'PR merged', 'PRs merged');
+  pushStat(totals.pr_closed ?? 0, 'PR closed', 'PRs closed');
+  pushStat(totals.issue_opened ?? 0, 'issue opened', 'issues opened');
+  pushStat(totals.issue_closed ?? 0, 'issue closed', 'issues closed');
+  pushStat(totals.release ?? 0, 'release');
+
   return (
     <div className="min-h-full">
       <div ref={filterBarRef} className="sm:sticky sm:top-0 z-10">
@@ -101,6 +118,9 @@ export function App() {
       </div>
       <Timeline events={filtered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
       <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900 space-y-1">
+        <div>
+          {fmt(data.events.length)} events: {statParts.join(', ')}
+        </div>
         <div>
           last fetched {generatedLabel} - window {data.windowDays}d - {data.repos.length} repo(s)
         </div>
