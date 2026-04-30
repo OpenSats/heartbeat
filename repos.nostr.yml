@@ -93,6 +93,7 @@ repos:
   - hzrd149/umbrel-blob-box
   - hzrd149/vite-plugin-funding
   - hzrd149/window.nostrdb.js
+  - quentintaranpino/nostrcheck-server
   - irislib/iris-messenger
   - KoalaSat/pokey
   - leo-lox/camelus
