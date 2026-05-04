@@ -62,6 +62,7 @@ repos:
   - fjahr/asmap-website
   - Fonta1n3/FullyNoded
   - gandlafbtc/nutstash-wallet
+  - getfloresta/floresta-nix
   - getlipa/invoice-detective
   - GigaBitcoin/secp256k1.swift
   - hodlinator/bitcoin
