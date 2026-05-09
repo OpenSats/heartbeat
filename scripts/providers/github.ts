@@ -346,7 +346,7 @@ async function fetchCommits(
   let repoFound = true;
 
   while (all.length < COMMITS_MAX_PER_REPO) {
-    const data = await client<CommitsHistoryResponse>(COMMITS_QUERY, {
+    const data: CommitsHistoryResponse = await client<CommitsHistoryResponse>(COMMITS_QUERY, {
       owner,
       name,
       first: Math.min(COMMITS_PAGE_SIZE, COMMITS_MAX_PER_REPO - all.length),
@@ -359,7 +359,8 @@ async function fetchCommits(
       break;
     }
 
-    const history = data.repository.defaultBranchRef?.target?.history;
+    const history: Connection<CommitNode> | undefined =
+      data.repository.defaultBranchRef?.target?.history;
     if (!history) break;
 
     all.push(...history.nodes);
