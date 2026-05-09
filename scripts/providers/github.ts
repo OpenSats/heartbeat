@@ -1,6 +1,18 @@
 import { graphql } from '@octokit/graphql';
 import type { Event, EventType } from '../../src/types';
 
+// --- Provider identity ------------------------------------------------------
+
+const HOST = 'github';
+
+function githubRepoKey(repo: string): string {
+  return `${HOST}:${repo}`;
+}
+
+function githubActorKey(actor: string): string {
+  return `${HOST}:${actor}`;
+}
+
 // --- Configurable knobs (env vars override defaults) ------------------------
 
 function intFromEnv(name: string, fallback: number): number {
@@ -189,11 +201,17 @@ type EventInput = {
 };
 
 function makeEvent(e: EventInput): Event {
+  const repoKey = githubRepoKey(e.repo);
+  const actorKey = githubActorKey(e.actor);
+
   return {
-    id: `${e.repo}:${e.type}:${e.nativeId}`,
+    id: `${repoKey}:${e.type}:${e.nativeId}`,
+    host: HOST,
+    repoKey,
     repo: e.repo,
     type: e.type,
     timestamp: e.timestamp,
+    actorKey,
     actor: e.actor,
     title: e.title,
     url: e.url,
@@ -328,7 +346,7 @@ async function fetchCommits(
   let repoFound = true;
 
   while (all.length < COMMITS_MAX_PER_REPO) {
-    const data = await client<CommitsHistoryResponse>(COMMITS_QUERY, {
+    const data: CommitsHistoryResponse = await client<CommitsHistoryResponse>(COMMITS_QUERY, {
       owner,
       name,
       first: Math.min(COMMITS_PAGE_SIZE, COMMITS_MAX_PER_REPO - all.length),
@@ -341,7 +359,8 @@ async function fetchCommits(
       break;
     }
 
-    const history = data.repository.defaultBranchRef?.target?.history;
+    const history: Connection<CommitNode> | undefined =
+      data.repository.defaultBranchRef?.target?.history;
     if (!history) break;
 
     all.push(...history.nodes);
