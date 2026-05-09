@@ -72,7 +72,6 @@ async function main() {
     windowDays: WINDOW_DAYS,
     repos: config.repos,
     groups: config.groups,
-    funds: {},
     events: all,
   };
   DatasetSchema.parse(dataset);

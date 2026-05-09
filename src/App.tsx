@@ -9,7 +9,7 @@ export function App() {
   const [data, setData] = useState<Dataset | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fundFilter = useUrlSet('funds');
+  const groupFilter = useUrlSet('groups');
   const repoFilter = useUrlSet('repos');
   const typeFilter = useUrlSet('types');
   const actorFilter = useUrlSet('devs');
@@ -35,25 +35,25 @@ export function App() {
     return () => ro.disconnect();
   }, [data]);
 
-  const fundReposUnion = useMemo(() => {
-    const sel = fundFilter.selected;
+  const groupReposUnion = useMemo(() => {
+    const sel = groupFilter.selected;
     if (!data || !sel || sel.size === 0) return null;
     const out = new Set<string>();
-    for (const f of sel) for (const r of data.funds[f] ?? []) out.add(r);
+    for (const group of sel) for (const repo of data.groups[group] ?? []) out.add(repo);
     return out;
-  }, [data, fundFilter.selected]);
+  }, [data, groupFilter.selected]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
     const inSet = (s: Set<string> | null, v: string) => !s || s.size === 0 || s.has(v);
     return data.events.filter(
       (e) =>
-        (!fundReposUnion || fundReposUnion.has(e.repo)) &&
+        (!groupReposUnion || groupReposUnion.has(e.repo)) &&
         inSet(repoFilter.selected, e.repo) &&
         inSet(typeFilter.selected, e.type) &&
         inSet(actorFilter.selected, e.actor),
     );
-  }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
+  }, [data, groupReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
 
   const { set: setRepoSelection } = repoFilter;
   const { set: setActorSelection } = actorFilter;
@@ -109,8 +109,8 @@ export function App() {
       <div ref={filterBarRef} className="sm:sticky sm:top-0 z-10">
         <FilterBar
           repos={data.repos}
-          funds={data.funds}
-          fundFilter={fundFilter}
+          groups={data.groups}
+          groupFilter={groupFilter}
           repoFilter={repoFilter}
           typeFilter={typeFilter}
           actorFilter={actorFilter}
@@ -127,7 +127,7 @@ export function App() {
         <div>
           repo missing?{' '}
           <a
-            href="https://github.com/OpenSats/heartbeat"
+            href="https://github.com/soveng/heartbeat"
             target="_blank"
             rel="noreferrer noopener"
             className="text-zinc-500 hover:text-zinc-300 transition-colors"

@@ -17,9 +17,9 @@ const chipClass = (active: boolean) =>
 
 type Props = {
   repos: string[];
-  funds: Record<string, string[]>;
+  groups: Record<string, string[]>;
 
-  fundFilter: FilterControl;
+  groupFilter: FilterControl;
   repoFilter: FilterControl;
   typeFilter: FilterControl;
   actorFilter: FilterControl;
@@ -79,8 +79,8 @@ function ChipRow({
 
 export function FilterBar({
   repos,
-  funds,
-  fundFilter,
+  groups,
+  groupFilter,
   repoFilter,
   typeFilter,
   actorFilter,
@@ -93,21 +93,21 @@ export function FilterBar({
   // at low priority. Keeps typing snappy on big repo lists.
   const deferredQuery = useDeferredValue(repoQuery);
 
-  const fundNames = useMemo(() => Object.keys(funds).sort(), [funds]);
+  const groupNames = useMemo(() => Object.keys(groups).sort(), [groups]);
   const has = (s: Set<string> | null, v: string) => s != null && s.has(v);
 
   const filteredRepos = useMemo(() => {
     let list = repos;
-    const sel = fundFilter.selected;
+    const sel = groupFilter.selected;
     if (sel && sel.size > 0) {
       const allowed = new Set<string>();
-      for (const f of sel) for (const r of funds[f] ?? []) allowed.add(r);
+      for (const group of sel) for (const repo of groups[group] ?? []) allowed.add(repo);
       list = list.filter((r) => allowed.has(r));
     }
     const q = deferredQuery.trim().toLowerCase();
     if (q) list = list.filter((r) => r.toLowerCase().includes(q));
     return list;
-  }, [repos, funds, fundFilter.selected, deferredQuery]);
+  }, [repos, groups, groupFilter.selected, deferredQuery]);
 
   const showRepoChips = reposExpanded || repoQuery.length > 0;
 
@@ -169,10 +169,10 @@ export function FilterBar({
     </>
   );
 
-  const markUrl = `${import.meta.env.BASE_URL}opensats-mark.svg`;
+  const markUrl = `${import.meta.env.BASE_URL}soveng-mark.svg`;
 
   const clearAll = () => {
-    fundFilter.clear();
+    groupFilter.clear();
     repoFilter.clear();
     typeFilter.clear();
     actorFilter.clear();
@@ -198,20 +198,24 @@ export function FilterBar({
           <h1 className="text-zinc-100 text-base font-medium">heartbeat</h1>
         </button>
         <a
-          href="https://opensats.org"
+          href="https://sovereignengineering.io"
           target="_blank"
           rel="noreferrer noopener"
           className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors"
         >
-          by OpenSats
+          by Sovereign Engineering
         </a>
       </div>
 
-      {fundNames.length > 0 && (
-        <ChipRow label="fund:" onClear={clearIfActive(fundFilter)}>
-          {fundNames.map((f) => (
-            <Chip key={f} active={has(fundFilter.selected, f)} onClick={() => fundFilter.toggle(f)}>
-              {f}
+      {groupNames.length > 0 && (
+        <ChipRow label="group:" onClear={clearIfActive(groupFilter)}>
+          {groupNames.map((group) => (
+            <Chip
+              key={group}
+              active={has(groupFilter.selected, group)}
+              onClick={() => groupFilter.toggle(group)}
+            >
+              {group}
             </Chip>
           ))}
         </ChipRow>
