@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-04-29
+### Changed
+
+- Adapted Heartbeat for Sovereign Engineering projects and
+  `heartbeat.sovereignengineering.io`.
+- Replaced static repo YAML files with a GitHub-backed import from the
+  Sovereign Engineering website project catalog.
+- Added grouped filters for SEC cohorts and the public `soveng` GitHub org.
+- Switched the fork to Bun-only install, test, build, fetch, and deployment
+  commands.
+- Kept search URLs compact by deriving matches from `?q=` instead of serializing
+  every query-matched repo into `?repos=`.
+
+### Added
+
+- Bun CI quality gates for formatting, tests, typecheck, lint, and production
+  build.
+- Fetch health checks that fail unhealthy GitHub refreshes before writing a new
+  dataset.
+- Catalog coverage metadata for source, project count, skipped links, empty
+  groups, and group counts.
+- Initial timeline row cap with a show-more control for large event feeds.
+- Vercel security and cache headers for the static deployment.
+
+### Documentation
+
+- Documented the fork branch workflow, upstream remote policy, Bun gates, and
+  deployment settings.
+
+## [Upstream 0.1.0] - 2026-04-29
+
+This section records the inherited OpenSats Heartbeat release history for
+provenance.
 
 First tagged release. Heartbeat is a static activity dashboard that renders
 commits, PRs, issues, and releases for a curated set of GitHub repos as a
@@ -32,7 +63,7 @@ as a static JSON file, so visitors never hit the GitHub API directly.
   the filename.
 - Collapsible repos row with a `show all <n>` / `<n> selected` summary
   chip and a clear shortcut.
-- Click the OpenSats mark / "heartbeat" title to reset every filter.
+- Click the brand mark / "heartbeat" title to reset every filter.
 - Footer line summarizing unfiltered totals by event type, plus a
   `repo missing? create a PR` invite.
 - Sticky filter bar and sticky day headers on desktop.
@@ -56,5 +87,5 @@ as a static JSON file, so visitors never hit the GitHub API directly.
 - Filter-driven work is deferred via `useDeferredValue` and the
   query-to-repos auto-select is debounced to coalesce history writes.
 
-[Unreleased]: https://github.com/OpenSats/heartbeat/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OpenSats/heartbeat/releases/tag/v0.1.0
+[Unreleased]: https://github.com/soveng/heartbeat/compare/v0.1.0...HEAD
+[Upstream 0.1.0]: https://github.com/OpenSats/heartbeat/releases/tag/v0.1.0

@@ -9,6 +9,10 @@ Target site: [heartbeat.sovereignengineering.io](https://heartbeat.sovereignengi
 Data is fetched at build time. The browser only reads `public/data/events.json`,
 so visitors never call GitHub directly and never spend API rate limit.
 
+Fork provenance: this project is adapted from
+[OpenSats/heartbeat](https://github.com/OpenSats/heartbeat). Keep the `upstream`
+remote pointed at OpenSats for later generic fix PRs.
+
 ## Develop
 
 Requires Bun 1.3+.
@@ -26,6 +30,7 @@ Useful checks:
 bun test
 bun run typecheck
 bun run lint
+bun run format:check
 bun run build
 ```
 
@@ -57,6 +62,18 @@ SOVENG_PROJECTS_JSON=https://example.com/showcaseProjects.json bun run fetch
 
 Knobs for the activity window and per-repo page sizes live at the top of
 [`scripts/fetch.ts`](scripts/fetch.ts).
+
+## Branch workflow
+
+- `master` is the Sovereign Engineering heartbeat base.
+- `upstream/master` tracks OpenSats heartbeat and is not used as the fork base.
+- Create scoped issue branches from latest `master`, named `issue/NN-short-name`.
+- Merge issue branches back to `master` with `git merge --ff-only`.
+- Keep issue branches after merge so they remain available for review and later
+  upstream extraction.
+- For upstream PRs, create new branches from `upstream/master` and manually port
+  only generic fixes. Do not include Sovereign Engineering branding, catalog
+  logic, domain config, or Bun-only choices unless upstream asks for them.
 
 ## Deploy
 
