@@ -1,6 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Event } from '../types';
 import { EventRow } from './EventRow';
+
+export const INITIAL_VISIBLE_EVENTS = 500;
+const VISIBLE_EVENT_STEP = 500;
 
 type Props = {
   events: Event[];
@@ -23,7 +26,12 @@ function groupByDay(events: Event[]): Array<[string, Event[]]> {
 }
 
 export function Timeline({ events, onSelectRepo, onSelectActor }: Props) {
-  const groups = useMemo(() => groupByDay(events), [events]);
+  const [expanded, setExpanded] = useState<{ events: Event[]; visibleCount: number } | null>(null);
+  const visibleCount = expanded?.events === events ? expanded.visibleCount : INITIAL_VISIBLE_EVENTS;
+
+  const visibleEvents = useMemo(() => events.slice(0, visibleCount), [events, visibleCount]);
+  const groups = useMemo(() => groupByDay(visibleEvents), [visibleEvents]);
+  const hiddenCount = events.length - visibleEvents.length;
 
   if (events.length === 0) {
     return <div className="text-zinc-500 px-2 py-8">No events match the current filters.</div>;
@@ -49,6 +57,25 @@ export function Timeline({ events, onSelectRepo, onSelectActor }: Props) {
           </div>
         </section>
       ))}
+      {hiddenCount > 0 && (
+        <div className="px-2 py-4 text-xs text-zinc-600">
+          <button
+            type="button"
+            onClick={() =>
+              setExpanded({
+                events,
+                visibleCount: Math.min(visibleCount + VISIBLE_EVENT_STEP, events.length),
+              })
+            }
+            className="border border-zinc-800 px-2 py-1 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition"
+          >
+            show {Math.min(VISIBLE_EVENT_STEP, hiddenCount).toLocaleString()} more
+          </button>
+          <span className="ml-2">
+            {visibleEvents.length.toLocaleString()} of {events.length.toLocaleString()}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
