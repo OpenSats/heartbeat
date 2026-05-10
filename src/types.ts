@@ -51,7 +51,12 @@ export type Dataset = z.infer<typeof DatasetSchema>;
 
 export const ConfigSchema = z.object({
   fund: z.string().optional(),
-  repos: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/name"')),
+  repos: z.array(
+    z.string().regex(
+      /^(?:[a-z0-9]+:)?[^/\s:]+\/[^/\s]+$/,
+      'expected "owner/name" or "host:owner/name"',
+    ),
+  ),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
