@@ -4,10 +4,20 @@ import { useUrlSet } from './lib/useUrlSet';
 import { useUrlString } from './lib/useUrlString';
 import { Timeline } from './components/Timeline';
 import { FilterBar } from './components/FilterBar';
-import type { Dataset } from './types';
+import type { Dataset, Event } from './types';
 
 const WINDOW_OPTIONS = [30, 60, 90, 180, 365] as const;
 const DEFAULT_WINDOW = 365;
+
+// Index derived from data.events at runtime so the UI can:
+//   - know the canonical repoKey for a plain repo display name
+//   - detect collisions (same plain "owner/name" appearing under multiple hosts)
+//   - look up the host for any repoKey when rendering the [host] badge
+export type RepoIndex = {
+  byRepo: Map<string, Set<string>>;   // plain repo -> repoKeys observed
+  hostOf: Map<string, string>;        // repoKey -> host
+  hasCollision: (repo: string) => boolean;
+};
 
 function useUrlWindow(): [number, (n: number) => void] {
   const read = () => {
@@ -66,6 +76,28 @@ export function App() {
     return () => ro.disconnect();
   }, [data]);
 
+  // Build the host-aware index from the loaded events. Recomputed only when
+  // data changes, then passed down to FilterBar for chip rendering.
+  const repoIndex = useMemo<RepoIndex | null>(() => {
+    if (!data) return null;
+    const byRepo = new Map<string, Set<string>>();
+    const hostOf = new Map<string, string>();
+    for (const e of data.events) {
+      let s = byRepo.get(e.repo);
+      if (!s) {
+        s = new Set();
+        byRepo.set(e.repo, s);
+      }
+      s.add(e.repoKey);
+      hostOf.set(e.repoKey, e.host);
+    }
+    return {
+      byRepo,
+      hostOf,
+      hasCollision: (r: string) => (byRepo.get(r)?.size ?? 0) > 1,
+    };
+  }, [data]);
+
   const fundReposUnion = useMemo(() => {
     const sel = fundFilter.selected;
     if (!data || !sel || sel.size === 0) return null;
@@ -81,6 +113,15 @@ export function App() {
 
   const authorExact = authorQuery.trim();
 
+  // Repo selections may contain either:
+  //   - a repoKey ("github:owner/name", "codeberg:owner/name") -- post-Step-4 default
+  //   - a plain repo ("owner/name")                            -- backward compatibility
+  // An event matches if its repoKey OR plain repo is in the selection.
+  const matchRepoSelection = (sel: Set<string> | null, e: Event) => {
+    if (!sel || sel.size === 0) return true;
+    return sel.has(e.repoKey) || sel.has(e.repo);
+  };
+
   const filtered = useMemo(() => {
     if (!data) return [];
     const inSet = (s: Set<string> | null, v: string) => !s || s.size === 0 || s.has(v);
@@ -88,7 +129,7 @@ export function App() {
       (e) =>
         Date.parse(e.timestamp) >= cutoffMs &&
         (!fundReposUnion || fundReposUnion.has(e.repo)) &&
-        inSet(repoFilter.selected, e.repo) &&
+        matchRepoSelection(repoFilter.selected, e) &&
         inSet(typeFilter.selected, e.type) &&
         inSet(actorFilter.selected, e.actor) &&
         (authorExact === '' || e.actor === authorExact),
@@ -105,8 +146,11 @@ export function App() {
 
   const { set: setRepoSelection } = repoFilter;
   const { set: setActorSelection } = actorFilter;
+
+  // Clicking a repo in a timeline row selects that exact host's activity by
+  // storing the repoKey. Events always carry a repoKey so no fallback needed.
   const onSelectRepo = useCallback(
-    (r: string) => setRepoSelection(new Set([r])),
+    (repoKey: string) => setRepoSelection(new Set([repoKey])),
     [setRepoSelection],
   );
   const onSelectActor = useCallback(
@@ -158,6 +202,7 @@ export function App() {
         <FilterBar
           repos={data.repos}
           funds={data.funds}
+          repoIndex={repoIndex}
           fundFilter={fundFilter}
           repoFilter={repoFilter}
           typeFilter={typeFilter}
