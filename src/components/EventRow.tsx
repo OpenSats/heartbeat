@@ -5,40 +5,18 @@ import { RepoLabel } from './RepoLabel';
 
 type Props = {
   event: Event;
-  onSelectRepo?: (repo: string) => void;
+  onSelectRepo?: (repoKey: string) => void;
   onSelectActor?: (actor: string) => void;
 };
 
 const FILTER_BUTTON_BASE = 'transition-colors truncate text-left cursor-pointer';
-
-function FilterButton({
-  value,
-  onSelect,
-  className,
-  children,
-}: {
-  value: string;
-  onSelect?: (value: string) => void;
-  className: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect?.(value)}
-      title={`filter by ${value}`}
-      className={`${FILTER_BUTTON_BASE} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
 
 export const EventRow = memo(EventRowImpl);
 
 function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
   const meta = EVENT_TYPE_META[event.type];
   const time = event.timestamp.slice(11, 16);
+
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 py-1 sm:py-0.5 px-2 text-sm leading-6 hover:bg-zinc-900/60">
       <span className="text-zinc-600 tabular-nums shrink-0">{time}</span>
@@ -54,20 +32,22 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       >
         {event.shortId}
       </a>
-      <FilterButton
-        value={event.repo}
-        onSelect={onSelectRepo}
-        className="text-zinc-300 sm:text-zinc-500 hover:text-zinc-300 min-w-0 max-w-[40vw] sm:max-w-[14rem]"
+      <button
+        type="button"
+        onClick={() => onSelectRepo?.(event.repoKey)}
+        title={`filter by ${event.repo}`}
+        className={`${FILTER_BUTTON_BASE} text-zinc-300 sm:text-zinc-500 hover:text-zinc-300 min-w-0 max-w-[40vw] sm:max-w-[14rem]`}
       >
         <RepoLabel repo={event.repo} />
-      </FilterButton>
-      <FilterButton
-        value={event.actor}
-        onSelect={onSelectActor}
-        className="text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelectActor?.(event.actor)}
+        title={`filter by ${event.actor}`}
+        className={`${FILTER_BUTTON_BASE} text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]`}
       >
         {event.actor}
-      </FilterButton>
+      </button>
       <a
         href={event.url}
         target="_blank"

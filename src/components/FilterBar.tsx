@@ -4,6 +4,7 @@ import { EVENT_TYPE_META } from '../eventTypes';
 import type { FilterControl } from '../lib/useUrlSet';
 import { useUrlString } from '../lib/useUrlString';
 import { RepoLabel } from './RepoLabel';
+import type { RepoIndex } from '../App';
 
 const CHIP_BASE = 'px-2 py-1 sm:py-0.5 text-xs rounded border transition';
 const CHIP_IDLE = 'border-zinc-800 bg-transparent text-zinc-500';
@@ -24,6 +25,7 @@ const windowChipClass = (active: boolean, disabled: boolean) => {
 type Props = {
   repos: string[];
   funds: Record<string, string[]>;
+  repoIndex: RepoIndex | null;
 
   fundFilter: FilterControl;
   repoFilter: FilterControl;
@@ -37,6 +39,18 @@ type Props = {
 
   authorQuery: string;
   setAuthorQuery: (s: string) => void;
+};
+
+// One filter-bar chip describing how a repo is rendered and selected.
+//   display:        plain "owner/name", what the user reads
+//   selectionValue: what gets stored in the URL set (repoKey when known,
+//                   plain repo as fallback)
+//   host:           non-null only when this chip is part of a collision pair
+//                   and a [host] badge should render
+type RepoChipValue = {
+  display: string;
+  selectionValue: string;
+  host: string | null;
 };
 
 const clearIfActive = (f: FilterControl) => (f.selected != null ? f.clear : undefined);
@@ -94,6 +108,7 @@ function ChipRow({
 export function FilterBar({
   repos,
   funds,
+  repoIndex,
   fundFilter,
   repoFilter,
   typeFilter,
@@ -116,8 +131,12 @@ export function FilterBar({
   const fundNames = useMemo(() => Object.keys(funds).sort(), [funds]);
   const has = (s: Set<string> | null, v: string) => s != null && s.has(v);
 
+  // First pass: filter the plain-repo list by fund and query.
+  // Dedupe input to defend against future cases where data.repos may contain
+  // the same display name twice (e.g. once per host before any backend
+  // collision resolution lands).
   const filteredRepos = useMemo(() => {
-    let list = repos;
+    let list = [...new Set(repos)];
     const sel = fundFilter.selected;
     if (sel && sel.size > 0) {
       const allowed = new Set<string>();
@@ -128,6 +147,29 @@ export function FilterBar({
     if (q) list = list.filter((r) => r.toLowerCase().includes(q));
     return list;
   }, [repos, funds, fundFilter.selected, deferredQuery]);
+
+  // Second pass: expand plain-repo entries into chips per the three-case rule:
+  //   1. exactly one known repoKey -> use that repoKey, no badge
+  //   2. multiple repoKeys (collision) -> one chip per host, with badge
+  //   3. zero events for this repo -> fall back to plain repo
+  const filteredRepoChips = useMemo<RepoChipValue[]>(() => {
+    return filteredRepos.flatMap((r) => {
+      const keys = repoIndex?.byRepo.get(r);
+
+      if (!keys || keys.size === 0) {
+        return [{ display: r, selectionValue: r, host: null }];
+      }
+      if (keys.size === 1) {
+        const onlyKey = [...keys][0];
+        return [{ display: r, selectionValue: onlyKey, host: null }];
+      }
+      return [...keys].sort().map((rk) => ({
+        display: r,
+        selectionValue: rk,
+        host: repoIndex!.hostOf.get(rk) ?? null,
+      }));
+    });
+  }, [filteredRepos, repoIndex]);
 
   const showRepoChips = reposExpanded || repoQuery.length > 0;
 
@@ -146,23 +188,46 @@ export function FilterBar({
         if (prev.length > 0) setRepoSelection(null);
         return;
       }
-      setRepoSelection(new Set(filteredRepos));
+      setRepoSelection(new Set(filteredRepoChips.map((c) => c.selectionValue)));
     }, 150);
     return () => clearTimeout(handle);
-  }, [deferredQuery, filteredRepos, setRepoSelection]);
+  }, [deferredQuery, filteredRepoChips, setRepoSelection]);
 
-  const renderRepoChips = (list: string[]) => {
+  // A chip is considered active if either its selectionValue (post-Step-4
+  // default, usually a repoKey) OR its plain display name (legacy URL form)
+  // is in the current selection. This keeps old bookmarked URLs visually
+  // correct after Step 4 lands.
+  const chipIsActive = (c: RepoChipValue) =>
+    has(repoFilter.selected, c.selectionValue) || has(repoFilter.selected, c.display);
+
+  // Toggling a chip whose active state comes from a legacy plain-repo URL
+  // entry must remove that legacy entry, not toggle the new repoKey form
+  // alongside it. Otherwise clicking an "active" chip would leave the old
+  // entry behind and visually appear unchanged. The repoKey path goes
+  // through the standard toggle.
+  const toggleRepoChip = (c: RepoChipValue) => {
+    const selected = repoFilter.selected;
+    if (selected?.has(c.display) && !selected.has(c.selectionValue)) {
+      const next = new Set(selected);
+      next.delete(c.display);
+      repoFilter.set(next.size > 0 ? next : null);
+      return;
+    }
+    repoFilter.toggle(c.selectionValue);
+  };
+
+  const renderRepoChips = (list: RepoChipValue[]) => {
     if (list.length === 0) {
       return <span className="text-xs text-zinc-600">no matching repos</span>;
     }
-    return list.map((r) => (
+    return list.map((c) => (
       <Chip
-        key={r}
-        active={has(repoFilter.selected, r)}
-        onClick={() => repoFilter.toggle(r)}
-        title={r}
+        key={c.selectionValue}
+        active={chipIsActive(c)}
+        onClick={() => toggleRepoChip(c)}
+        title={c.host ? `${c.display} (${c.host})` : c.display}
       >
-        <RepoLabel repo={r} />
+        <RepoLabel repo={c.display} host={c.host} />
       </Chip>
     ));
   };
@@ -170,7 +235,9 @@ export function FilterBar({
   const repoClearIfActive = clearIfActive(repoFilter);
   const selectedRepoCount = repoFilter.selected?.size ?? 0;
   const repoToggleLabel =
-    selectedRepoCount > 0 ? `${selectedRepoCount} selected` : `show all ${filteredRepos.length}`;
+    selectedRepoCount > 0
+      ? `${selectedRepoCount} selected`
+      : `show all ${filteredRepoChips.length}`;
 
   const filterRowContent = (
     <>
@@ -295,7 +362,7 @@ export function FilterBar({
         </ChipRow>
         {showRepoChips && (
           <div className="flex flex-wrap items-center gap-1.5 sm:max-h-[40vh] sm:overflow-y-auto">
-            {renderRepoChips(filteredRepos)}
+            {renderRepoChips(filteredRepoChips)}
           </div>
         )}
       </div>
