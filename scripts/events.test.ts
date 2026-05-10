@@ -109,6 +109,13 @@ describe('DatasetSchema', () => {
         windowDays: 90,
         repos: [repo],
         groups: { 'SEC-01': [repo] },
+        catalog: {
+          source: 'test',
+          projectCount: 1,
+          skippedLinkCount: 0,
+          emptyGroups: [],
+          groupCounts: { 'SEC-01': 1 },
+        },
         events: [],
       }),
     ).not.toThrow();

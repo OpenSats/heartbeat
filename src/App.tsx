@@ -112,6 +112,9 @@ export function App() {
   pushStat(totals.issue_opened ?? 0, 'issue opened', 'issues opened');
   pushStat(totals.issue_closed ?? 0, 'issue closed', 'issues closed');
   pushStat(totals.release ?? 0, 'release');
+  const catalogStatus = data.catalog
+    ? `${fmt(data.catalog.projectCount)} project(s) - ${fmt(data.catalog.skippedLinkCount)} skipped link(s) - ${fmt(data.catalog.emptyGroups.length)} empty group(s)`
+    : null;
 
   return (
     <div className="min-h-full">
@@ -135,6 +138,7 @@ export function App() {
         <div>
           last fetched {generatedLabel} - window {data.windowDays}d - {data.repos.length} repo(s)
         </div>
+        {catalogStatus && <div title={data.catalog?.source}>catalog {catalogStatus}</div>}
         <div>
           repo missing?{' '}
           <a

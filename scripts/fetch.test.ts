@@ -14,6 +14,7 @@ const generatedAt = new Date('2026-05-10T00:00:00Z');
 const config: RepoGroupConfig = {
   repos: ['owner/active', 'owner/old', 'owner/missing'],
   groups: { 'SEC-01': ['owner/active', 'owner/old', 'owner/missing'] },
+  emptyGroups: ['SEC-00'],
   skipped: [],
   source: 'test',
   projectCount: 3,
@@ -58,6 +59,13 @@ describe('buildDatasetFromConfig', () => {
     });
 
     expect(dataset.events.map((event) => event.repo)).toEqual(['owner/active']);
+    expect(dataset.catalog).toEqual({
+      source: 'test',
+      projectCount: 3,
+      skippedLinkCount: 0,
+      emptyGroups: ['SEC-00'],
+      groupCounts: { 'SEC-00': 0, 'SEC-01': 3 },
+    });
     expect(health).toMatchObject({
       totalRepos: 3,
       successfulRepos: 2,

@@ -25,11 +25,21 @@ export const EventSchema = z.object({
 });
 export type Event = z.infer<typeof EventSchema>;
 
+export const CatalogCoverageSchema = z.object({
+  source: z.string(),
+  projectCount: z.number(),
+  skippedLinkCount: z.number(),
+  emptyGroups: z.array(z.string()),
+  groupCounts: z.record(z.string(), z.number()),
+});
+export type CatalogCoverage = z.infer<typeof CatalogCoverageSchema>;
+
 export const DatasetSchema = z.object({
   generatedAt: z.string(),
   windowDays: z.number(),
   repos: z.array(z.string()),
   groups: z.record(z.string(), z.array(z.string())).default({}),
+  catalog: CatalogCoverageSchema.optional(),
   events: z.array(EventSchema),
 });
 export type Dataset = z.infer<typeof DatasetSchema>;

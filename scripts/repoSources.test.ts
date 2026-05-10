@@ -88,6 +88,7 @@ describe('buildRepoGroupsFromProjects', () => {
     expect(config.groups['SEC-02']).toEqual(['cashubtc/nuts']);
     expect(config.groups['SEC-05']).toEqual(['Routstr/local-plus-plus', 'Routstr/otrta-client']);
     expect(config.groups.soveng).toEqual(['soveng/heartbeat', 'soveng/website']);
+    expect(config.emptyGroups).toEqual(['SEC-07']);
     expect(config.repos.filter((repo) => repo === 'cashubtc/nuts')).toHaveLength(1);
     expect(config.skipped).toContainEqual(
       expect.objectContaining({ cohort: 'SEC-07', project: 'Site-only project' }),

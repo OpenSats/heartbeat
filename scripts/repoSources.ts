@@ -37,6 +37,7 @@ export type SkippedProjectLink = {
 export type RepoGroupConfig = {
   repos: string[];
   groups: Record<string, string[]>;
+  emptyGroups: string[];
   skipped: SkippedProjectLink[];
   source: string;
   projectCount: number;
@@ -121,11 +122,13 @@ export async function buildRepoGroupsFromProjects(
   options: BuildOptions = {},
 ): Promise<RepoGroupConfig> {
   const groups = new Map<string, Set<string>>();
+  const seenGroups = new Set<string>();
   const skipped: SkippedProjectLink[] = [];
   const ownerCache = new Map<string, Promise<string[]>>();
 
   for (const project of projects) {
     const cohort = project.cohort ?? 'unknown';
+    seenGroups.add(cohort);
     for (const rawLink of projectLinks(project)) {
       const ref = githubReferenceFromUrl(rawLink);
       if (ref.type === 'repo') {
@@ -141,6 +144,7 @@ export async function buildRepoGroupsFromProjects(
   }
 
   for (const owner of options.additionalOwners ?? []) {
+    seenGroups.add(owner);
     await addOwnerRepos(owner, owner, groups, ownerCache, listOwnerRepos);
   }
 
@@ -158,6 +162,7 @@ export async function buildRepoGroupsFromProjects(
   return {
     repos: [...allRepos].sort(compareIds),
     groups: sortedGroups,
+    emptyGroups: [...seenGroups].filter((group) => !sortedGroups[group]).sort(compareIds),
     skipped,
     source: options.source ?? 'inline',
     projectCount: projects.length,

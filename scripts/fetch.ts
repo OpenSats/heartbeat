@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { graphql } from '@octokit/graphql';
-import { DatasetSchema, type Dataset, type Event } from '../src/types';
+import { DatasetSchema, type CatalogCoverage, type Dataset, type Event } from '../src/types';
 import { fetchRepoActivity, type RepoFetchLimits } from './github';
 import { repoActivityToEvents } from './events';
 import { loadRepoConfig, type RepoGroupConfig } from './repoSources';
@@ -76,6 +76,21 @@ function defaultLimits(): RepoFetchLimits {
   };
 }
 
+function catalogCoverage(config: RepoGroupConfig): CatalogCoverage {
+  const groupCounts = Object.fromEntries(
+    [...Object.keys(config.groups), ...config.emptyGroups]
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+      .map((group) => [group, config.groups[group]?.length ?? 0]),
+  );
+  return {
+    source: config.source,
+    projectCount: config.projectCount,
+    skippedLinkCount: config.skipped.length,
+    emptyGroups: config.emptyGroups,
+    groupCounts,
+  };
+}
+
 export function assertFetchHealthy(health: FetchHealth, maxFailures = MAX_FETCH_FAILURES): void {
   if (health.failedRepos.length <= maxFailures) return;
   const failed = health.failedRepos
@@ -128,6 +143,7 @@ export async function buildDatasetFromConfig(
     windowDays,
     repos: config.repos,
     groups: config.groups,
+    catalog: catalogCoverage(config),
     events: all,
   };
   DatasetSchema.parse(dataset);
