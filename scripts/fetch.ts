@@ -3,7 +3,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 
-import { ConfigSchema, DatasetSchema, type Dataset, type Event } from '../src/types';
+import {
+  ConfigSchema,
+  DatasetSchema,
+  InstancesSchema,
+  type Dataset,
+  type Event,
+  type Instances,
+} from '../src/types';
 import { fetchGitHubRepo, getGitHubToken, makeGitHubClient } from './providers/github';
 import {
   CODEBERG_BASE_URL,
@@ -11,11 +18,12 @@ import {
   fetchForgejoRepo,
   getCodebergToken,
   makeForgejoClient,
+  type ForgejoClient,
 } from './providers/forgejo';
 
 type RepoEntry = {
   raw: string; // original yaml string, e.g. "codeberg:forgejo/forgejo"
-  host: string; // "github" | "codeberg"
+  host: string; // "github" | "codeberg" | any registered self-hosted label
   ownerName: string; // "forgejo/forgejo"
   displayName: string; // "forgejo/forgejo" (no host prefix; used in dataset.repos and UI)
 };
@@ -40,6 +48,7 @@ const WINDOW_DAYS = intFromEnv('HEARTBEAT_WINDOW_DAYS', 90);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_FILE_PATTERN = /^repos(\..+)?\.ya?ml$/i;
 const OUT_PATH = resolve(ROOT, 'public/data/events.json');
+const INSTANCES_FILE = resolve(ROOT, 'instances.yml');
 
 function fundFromFilename(file: string): string {
   const m = file.match(/^repos\.(.+)\.ya?ml$/i);
@@ -92,21 +101,78 @@ async function loadConfig(): Promise<LoadedConfig> {
   };
 }
 
-async function main() {
-  const config = await loadConfig();
+// Loads optional instances.yml. Missing file is treated as an empty registry,
+// not an error.
+async function loadInstances(): Promise<Instances> {
+  let raw: string;
+  try {
+    raw = await readFile(INSTANCES_FILE, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    throw err;
+  }
+  const parsed = yaml.load(raw);
+  // An empty file (or one with only comments) parses as null/undefined; treat
+  // that as an empty registry too.
+  if (parsed == null) return {};
+  return InstancesSchema.parse(parsed);
+}
 
-  // Lazily build clients only for hosts that appear in config.
-  const usesGitHub = config.entries.some((e) => e.host === 'github');
-  const usesCodeberg = config.entries.some((e) => e.host === CODEBERG_HOST);
+// Builds a map of host label -> ForgejoClient for every Forgejo/Gitea-style
+// host that appears in config. Codeberg is always registered as a built-in
+// (using the constants from the forgejo provider). Self-hosted instances come
+// from instances.yml. The built-in always wins over a user-defined `codeberg`.
+function buildForgejoClients(
+  hostsInUse: Set<string>,
+  instances: Instances,
+): Map<string, ForgejoClient> {
+  const clients = new Map<string, ForgejoClient>();
 
-  const githubClient = usesGitHub ? makeGitHubClient(getGitHubToken()) : null;
-  const codebergClient = usesCodeberg
-    ? makeForgejoClient({
+  // Built-in: Codeberg.
+  if (hostsInUse.has(CODEBERG_HOST)) {
+    clients.set(
+      CODEBERG_HOST,
+      makeForgejoClient({
         baseUrl: CODEBERG_BASE_URL,
         host: CODEBERG_HOST,
         token: getCodebergToken(),
-      })
-    : null;
+      }),
+    );
+  }
+
+  // User-defined instances. The codeberg label is reserved.
+  for (const [label, inst] of Object.entries(instances)) {
+    if (label === CODEBERG_HOST) {
+      console.warn(
+        `! instances.yml: "${CODEBERG_HOST}" is a built-in host and cannot be redefined; ignoring`,
+      );
+      continue;
+    }
+    if (!hostsInUse.has(label)) continue;
+
+    const token = inst.tokenEnv ? process.env[inst.tokenEnv] : undefined;
+    clients.set(
+      label,
+      makeForgejoClient({
+        baseUrl: inst.baseUrl,
+        host: label,
+        token: token && token !== '' ? token : undefined,
+      }),
+    );
+  }
+
+  return clients;
+}
+
+async function main() {
+  const config = await loadConfig();
+  const instances = await loadInstances();
+
+  const hostsInUse = new Set(config.entries.map((e) => e.host));
+  const usesGitHub = hostsInUse.has('github');
+
+  const githubClient = usesGitHub ? makeGitHubClient(getGitHubToken()) : null;
+  const forgejoClients = buildForgejoClients(hostsInUse, instances);
 
   const cutoffMs = Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000;
   console.log(`Fetching ${config.entries.length} repo(s), window=${WINDOW_DAYS}d`);
@@ -118,11 +184,15 @@ async function main() {
 
       if (entry.host === 'github') {
         result = await fetchGitHubRepo(githubClient!, entry.ownerName, cutoffMs);
-      } else if (entry.host === CODEBERG_HOST) {
-        result = await fetchForgejoRepo(codebergClient!, entry.ownerName, cutoffMs);
       } else {
-        console.warn(`! ${entry.raw}: unknown host "${entry.host}", skipping`);
-        continue;
+        const client = forgejoClients.get(entry.host);
+        if (!client) {
+          console.warn(
+            `! ${entry.raw}: unknown host "${entry.host}" (not built-in and not in instances.yml), skipping`,
+          );
+          continue;
+        }
+        result = await fetchForgejoRepo(client, entry.ownerName, cutoffMs);
       }
 
       if (!result.ok) {
