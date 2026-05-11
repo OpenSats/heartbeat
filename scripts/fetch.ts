@@ -20,12 +20,20 @@ import {
   makeForgejoClient,
   type ForgejoClient,
 } from './providers/forgejo';
+import {
+  GITLAB_BASE_URL,
+  GITLAB_HOST,
+  fetchGitLabRepo,
+  getGitLabToken,
+  makeGitLabClient,
+  type GitLabClient,
+} from './providers/gitlab';
 
 type RepoEntry = {
   raw: string; // original yaml string, e.g. "codeberg:forgejo/forgejo"
-  host: string; // "github" | "codeberg" | any registered self-hosted label
-  ownerName: string; // "forgejo/forgejo"
-  displayName: string; // "forgejo/forgejo" (no host prefix; used in dataset.repos and UI)
+  host: string; // "github" | "codeberg" | "gitlab" | any registered self-hosted label
+  ownerName: string; // "forgejo/forgejo" or "gitlab-org/cli" or "group/sub/proj"
+  displayName: string; // no host prefix; used in dataset.repos and UI
 };
 
 type LoadedConfig = {
@@ -140,11 +148,12 @@ function buildForgejoClients(
     );
   }
 
-  // User-defined instances. The codeberg label is reserved.
+  // User-defined instances. Reserved labels (built-ins) cannot be redefined.
+  const reserved = new Set<string>([CODEBERG_HOST, GITLAB_HOST, 'github']);
   for (const [label, inst] of Object.entries(instances)) {
-    if (label === CODEBERG_HOST) {
+    if (reserved.has(label)) {
       console.warn(
-        `! instances.yml: "${CODEBERG_HOST}" is a built-in host and cannot be redefined; ignoring`,
+        `! instances.yml: "${label}" is a built-in host and cannot be redefined; ignoring`,
       );
       continue;
     }
@@ -170,8 +179,16 @@ async function main() {
 
   const hostsInUse = new Set(config.entries.map((e) => e.host));
   const usesGitHub = hostsInUse.has('github');
+  const usesGitLab = hostsInUse.has(GITLAB_HOST);
 
   const githubClient = usesGitHub ? makeGitHubClient(getGitHubToken()) : null;
+  const gitlabClient: GitLabClient | null = usesGitLab
+    ? makeGitLabClient({
+        baseUrl: GITLAB_BASE_URL,
+        host: GITLAB_HOST,
+        token: getGitLabToken(),
+      })
+    : null;
   const forgejoClients = buildForgejoClients(hostsInUse, instances);
 
   const cutoffMs = Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -184,6 +201,8 @@ async function main() {
 
       if (entry.host === 'github') {
         result = await fetchGitHubRepo(githubClient!, entry.ownerName, cutoffMs);
+      } else if (entry.host === GITLAB_HOST) {
+        result = await fetchGitLabRepo(gitlabClient!, entry.ownerName, cutoffMs);
       } else {
         const client = forgejoClients.get(entry.host);
         if (!client) {
