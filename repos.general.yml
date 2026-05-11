@@ -171,3 +171,4 @@ repos:
   - zeugmaster/CashuSwift
   - zeugmaster/macadamia
   - codeberg:forgejo/forgejo
+  - gitlab:gitlab-org/cli
