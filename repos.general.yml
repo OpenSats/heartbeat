@@ -32,6 +32,22 @@ repos:
   - bitcoinfuzz/bitcoinfuzz
   - bitcoinppl/cove
   - bitcoinresearchkit/brk
+  - Bitshala/.github
+  - Bitshala/admin
+  - Bitshala/admin-backend
+  - Bitshala/admin-frontend
+  - Bitshala/admin-panel
+  - Bitshala/bitdevs
+  - Bitshala/bitnode
+  - Bitshala/BitcoinCore-PR-Review-Club
+  - Bitshala/BOSS-Summit
+  - Bitshala/discord-bot
+  - Bitshala/LBTCL
+  - Bitshala/MB-cohort
+  - Bitshala/PB-Cohort
+  - Bitshala/portal-frontend
+  - Bitshala/reading-club
+  - Bitshala/website-v2
   - bjohnson5/blast
   - BlitzWallet/BlitzWallet
   - BlixtWallet/noah
