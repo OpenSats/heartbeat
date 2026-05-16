@@ -5,8 +5,13 @@ repos:
   - arkin0x/cyberspace
   - atrifat/nostr-filter-relay
   - AustinKelsay/nip55-ios-test
+  - barrydeen/algo-relay
+  - barrydeen/haven
+  - barrydeen/moar
+  - barrydeen/nostrarchives-api
+  - barrydeen/wisp
+  - barrydeen/wot-relay
   - believethehype/dvm
-  - bitvora/algo-relay
   - blackcoffeexbt/hardware-nostr-connect-device
   - BlowaterNostr/blowater
   - camelus-hq/camelus
