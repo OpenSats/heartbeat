@@ -1,23 +1,78 @@
 name: Build and deploy to Pages
-
 on:
   push:
     branches: [master]
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
-
+    inputs:
+      force_fetch:
+        description: 'Force a full fetch even if no fetch-relevant files changed'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
-
 concurrency:
   group: pages
-  cancel-in-progress: true
-
+  cancel-in-progress: false
 jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      should_fetch: ${{ steps.decide.outputs.should_fetch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: decide
+        name: Decide whether to fetch
+        run: |
+          # Schedule and manual force-fetch always fetch
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "Reason: scheduled run"
+            echo "should_fetch=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force_fetch }}" = "true" ]; then
+            echo "Reason: manual force_fetch"
+            echo "should_fetch=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Self-heal: if data branch is missing, fetch
+          if ! git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            echo "Reason: data branch does not exist"
+            echo "should_fetch=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For pushes: check whether the diff touched fetch-relevant paths
+          if [ "${{ github.event_name }}" = "push" ]; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD)
+            echo "Changed files:"
+            echo "$CHANGED"
+            if echo "$CHANGED" | grep -E '^(scripts/|repos(\..+)?\.ya?ml$|instances\.ya?ml$|package(-lock)?\.json$|\.github/workflows/build\.yml$)' >/dev/null; then
+              echo "Reason: push touched fetch-relevant files"
+              echo "should_fetch=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Reason: push touched no fetch-relevant files, skipping fetch"
+            echo "should_fetch=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # workflow_dispatch with force_fetch=false — skip
+          echo "Reason: workflow_dispatch without force_fetch"
+          echo "should_fetch=false" >> $GITHUB_OUTPUT
+
   build:
+    needs: decide
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,13 +81,55 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+
       - name: Fetch events
+        if: needs.decide.outputs.should_fetch == 'true'
         run: npm run fetch
         env:
           GITHUB_TOKEN: ${{ secrets.HEARTBEAT_PAT }}
           HEARTBEAT_WINDOW_DAYS: '365'
+
+      - name: Restore events.json from data branch
+        if: needs.decide.outputs.should_fetch == 'false'
+        run: |
+          mkdir -p public/data
+          git fetch origin data
+          if ! git show origin/data:public/data/events.json > public/data/events.json 2>/dev/null; then
+            echo "::error::data branch has no public/data/events.json — cannot skip fetch"
+            exit 1
+          fi
+          if [ ! -s public/data/events.json ]; then
+            echo "::error::restored events.json is empty"
+            exit 1
+          fi
+          echo "Restored events.json from data branch ($(wc -c < public/data/events.json) bytes)"
+
+      - name: Publish events.json to data branch
+        if: needs.decide.outputs.should_fetch == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Work in a separate directory to avoid clobbering the build tree
+          mkdir -p /tmp/data-branch
+          cp public/data/events.json /tmp/data-branch/events.json
+          cd /tmp/data-branch
+          git init -q
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git fetch origin data --depth=1 || true
+          git checkout -B data
+          mkdir -p public/data
+          mv events.json public/data/events.json
+          git add public/data/events.json
+          if git diff --cached --quiet; then
+            echo "events.json unchanged, nothing to commit"
+          else
+            git commit -q -m "data: refresh events.json ($(date -u +%FT%TZ))"
+            git push -q origin data
+          fi
+
       - name: Build site
         run: npx vite build --base=/heartbeat365/
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
