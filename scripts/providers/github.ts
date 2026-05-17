@@ -1,5 +1,6 @@
 import { graphql } from '@octokit/graphql';
 import type { Event, EventType } from '../../src/types';
+import { retryable } from '../lib/retry';
 
 // --- Provider identity ------------------------------------------------------
 
@@ -307,17 +308,22 @@ async function paginate<T extends { updatedAt?: string; createdAt: string }>(
   maxNodes: number,
   cutoffMs: number,
   pickConnection: (data: any) => Connection<T> | null,
+  label: string,
 ): Promise<T[]> {
   const all: T[] = [];
   let cursor: string | null = null;
 
   while (all.length < maxNodes) {
-    const data = await client<any>(query, {
-      owner,
-      name,
-      first: Math.min(pageSize, maxNodes - all.length),
-      after: cursor,
-    });
+    const data = await retryable(
+      () =>
+        client<any>(query, {
+          owner,
+          name,
+          first: Math.min(pageSize, maxNodes - all.length),
+          after: cursor,
+        }),
+      { label: `github ${owner}/${name} ${label}` },
+    );
     const conn = pickConnection(data);
     if (!conn) break;
     all.push(...conn.nodes);
@@ -346,13 +352,17 @@ async function fetchCommits(
   let repoFound = true;
 
   while (all.length < COMMITS_MAX_PER_REPO) {
-    const data: CommitsHistoryResponse = await client<CommitsHistoryResponse>(COMMITS_QUERY, {
-      owner,
-      name,
-      first: Math.min(COMMITS_PAGE_SIZE, COMMITS_MAX_PER_REPO - all.length),
-      after: cursor,
-      since: sinceISO,
-    });
+    const data: CommitsHistoryResponse = await retryable(
+      () =>
+        client<CommitsHistoryResponse>(COMMITS_QUERY, {
+          owner,
+          name,
+          first: Math.min(COMMITS_PAGE_SIZE, COMMITS_MAX_PER_REPO - all.length),
+          after: cursor,
+          since: sinceISO,
+        }),
+      { label: `github ${owner}/${name} commits` },
+    );
 
     if (data.repository == null) {
       repoFound = false;
@@ -421,6 +431,7 @@ export async function fetchGitHubRepo(
       PRS_MAX_PER_REPO,
       cutoffMs,
       (data) => data?.repository?.pullRequests ?? null,
+      'pulls',
     ),
     paginate<IssueNode>(
       client,
@@ -431,6 +442,7 @@ export async function fetchGitHubRepo(
       ISSUES_MAX_PER_REPO,
       cutoffMs,
       (data) => data?.repository?.issues ?? null,
+      'issues',
     ),
     paginate<ReleaseNode>(
       client,
@@ -441,6 +453,7 @@ export async function fetchGitHubRepo(
       RELEASES_MAX_PER_REPO,
       cutoffMs,
       (data) => data?.repository?.releases ?? null,
+      'releases',
     ),
   ]);
 
