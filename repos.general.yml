@@ -186,5 +186,5 @@ repos:
   - zerosync/zerosync
   - zeugmaster/CashuSwift
   - zeugmaster/macadamia
-  - codeberg:forgejo/forgejo
+  - codeberg:joinmarket-ng/joinmarket-ng
   - gitlab:gitlab-org/cli
