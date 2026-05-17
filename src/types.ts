@@ -56,16 +56,20 @@ export type Dataset = z.infer<typeof DatasetSchema>;
 //   "gitlab:group/subgroup/.../project"   -> GitLab nested namespace (2+ segments)
 //   "git:https://host/path/to/repo"       -> Plain Git URL (https only, commits-only)
 //   "git:https://host/path/to/repo.git"   -> Plain Git URL with .git suffix (normalized away)
+//   "nostr:naddr1..."                     -> NIP-34 Nostr-native repo (bech32 naddr payload)
 // "github:" as an explicit prefix is rejected; GitHub entries must use the
 // bare "owner/name" form. Only "gitlab:" entries may have more than two
 // slash-separated segments after the prefix. Plain-Git entries must start
 // with "git:https://" and contain at least one path segment after the host.
+// Nostr entries must be a "nostr:" prefix followed by a NIP-19 naddr1 string
+// (lowercase bech32 alphabet, no separators). YAML requires quoting these
+// values because the embedded colon is otherwise ambiguous.
 export const ConfigSchema = z.object({
   fund: z.string().optional(),
   repos: z.array(
     z.string().regex(
-      /^(?:[^/\s:]+\/[^/\s:]+|gitlab:[^/\s:]+(?:\/[^/\s:]+)+|git:https:\/\/[^/\s:?#@]+(?:\/[^/\s?#]+)+(?:\.git)?\/?|(?!(?:github|gitlab|git):)[a-z0-9]+:[^/\s:]+\/[^/\s:]+)$/,
-      'expected "owner/name", "gitlab:group/project", "gitlab:group/subgroup/project", "host:owner/name", or "git:https://host/path/to/repo"',
+      /^(?:[^/\s:]+\/[^/\s:]+|gitlab:[^/\s:]+(?:\/[^/\s:]+)+|git:https:\/\/[^/\s:?#@]+(?:\/[^/\s?#]+)+(?:\.git)?\/?|nostr:naddr1[a-z0-9]+|(?!(?:github|gitlab|git|nostr):)[a-z0-9]+:[^/\s:]+\/[^/\s:]+)$/,
+      'expected "owner/name", "gitlab:group/project", "gitlab:group/subgroup/project", "host:owner/name", "git:https://host/path/to/repo", or "nostr:naddr1..."',
     ),
   ),
 });

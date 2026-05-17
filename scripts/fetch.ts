@@ -29,13 +29,15 @@ import {
   type GitLabClient,
 } from './providers/gitlab';
 import { GIT_HOST, fetchGitRepo, normalizeGitEntry } from './providers/git';
+import { NOSTR_HOST, fetchNostrRepo, parseNostrEntry } from './providers/nostr';
 
 type RepoEntry = {
   raw: string; // original yaml string (post-normalization for git: entries)
-  host: string; // "github" | "codeberg" | "gitlab" | "git" | any registered self-hosted label
-  ownerName: string; // "forgejo/forgejo" or "gitlab-org/cli" or normalized URL for git: entries
+  host: string; // "github" | "codeberg" | "gitlab" | "git" | "nostr" | any registered self-hosted label
+  ownerName: string; // "forgejo/forgejo" or "gitlab-org/cli" or normalized URL for git: entries or "<pubkey>:<d-tag>" for nostr
   displayName: string; // no host prefix; used in dataset.repos and UI
   cloneUrl?: string; // git: entries only; the URL passed to `git clone` (may include .git)
+  naddr?: string; // nostr: entries only; the original "nostr:naddr1..." string passed to the provider
 };
 
 type LoadedConfig = {
@@ -68,7 +70,9 @@ function fundFromFilename(file: string): string {
 // Parses a single repo entry from YAML into a structured RepoEntry. For
 // "git:" entries the URL is normalized (lowercase host, strip trailing
 // slash, strip .git) so equivalent spellings collapse to one entry. For
-// non-git entries the raw string is preserved as-is.
+// "nostr:" entries the naddr is decoded into pubkey + identifier for the
+// repoKey; the original naddr is preserved for the provider to use. For
+// other entries the raw string is preserved as-is.
 function parseRepoEntry(raw: string): RepoEntry | null {
   // git: entries get URL normalization
   if (raw.startsWith('git:')) {
@@ -80,6 +84,25 @@ function parseRepoEntry(raw: string): RepoEntry | null {
       ownerName: norm.url, // canonical URL (no .git), used for repoKey + event URLs
       displayName: norm.display, // "example.com/foo/bar"
       cloneUrl: norm.cloneUrl, // URL to pass to `git clone` (may include .git)
+    };
+  }
+
+  // nostr: entries get naddr decoded for pubkey/identifier extraction
+  if (raw.startsWith('nostr:')) {
+    let coords;
+    try {
+      coords = parseNostrEntry(raw);
+    } catch (err) {
+      console.warn(`! ${raw}: ${(err as Error).message}`);
+      return null;
+    }
+    if (!coords) return null; // not a nostr:naddr1... shape; ConfigSchema regex should have caught it
+    return {
+      raw, // original "nostr:naddr1..." used as the dedup key
+      host: NOSTR_HOST,
+      ownerName: `${coords.pubkey}:${coords.identifier}`, // used in repoKey
+      displayName: coords.identifier, // d-tag; replaced by 30617 "name" tag once fetched
+      naddr: raw, // passed verbatim to fetchNostrRepo
     };
   }
 
@@ -173,7 +196,13 @@ function buildForgejoClients(
   }
 
   // User-defined instances. Reserved labels (built-ins) cannot be redefined.
-  const reserved = new Set<string>([CODEBERG_HOST, GITLAB_HOST, GIT_HOST, 'github']);
+  const reserved = new Set<string>([
+    CODEBERG_HOST,
+    GITLAB_HOST,
+    GIT_HOST,
+    NOSTR_HOST,
+    'github',
+  ]);
   for (const [label, inst] of Object.entries(instances)) {
     if (reserved.has(label)) {
       console.warn(
@@ -234,6 +263,8 @@ async function main() {
           entry.displayName,
           cutoffMs,
         );
+      } else if (entry.host === NOSTR_HOST) {
+        result = await fetchNostrRepo(entry.naddr ?? entry.raw, cutoffMs);
       } else {
         const client = forgejoClients.get(entry.host);
         if (!client) {
