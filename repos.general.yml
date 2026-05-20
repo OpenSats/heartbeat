@@ -12,6 +12,12 @@ repos:
   - asmap/rpki-client-nix
   - bennyhodl/dlcdevkit
   - BFF-org/cto
+  - bitaxeorg/bitaxe-3d-prints
+  - bitaxeorg/bitaxe-web-flasher
+  - bitaxeorg/BitaxeGT
+  - bitaxeorg/bitaxeGamma
+  - bitaxeorg/ESP-Miner
+  - bitaxeorg/ultraHex
   - bitcoin-core/gui-qml
   - bitcoin-dev-project/warnet
   - bitcoin/bitcoin
@@ -168,7 +174,6 @@ repos:
   - selfcustody/krux-installer
   - setavenger/blindbit-oracle
   - Sjors/bitcoin
-  - skot/bitaxe
   - SovranBitcoin/Sovran
   - stratum-mining/benchmarking-tool
   - stratum-mining/stratum
