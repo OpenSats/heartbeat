@@ -230,11 +230,17 @@ repos:
   - YakiHonne/mobile-app
   - YakiHonne/web-app
   - zapstore/blossomd
+  - zapstore/defender
   - zapstore/ftsrelay
+  - zapstore/goapk
+  - zapstore/guardrail
   - zapstore/indexer
+  - zapstore/knox
   - zapstore/relay
+  - zapstore/webapp
   - zapstore/website
   - zapstore/zapstore
   - zapstore/zapstore-cli
+  - zapstore/zsp
   - ZharlieW/Aegis
   - zmeyer44/flockstr
