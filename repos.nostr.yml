@@ -1,4 +1,29 @@
 repos:
+  - 44Billion/44b-relay
+  - 44Billion/44b-vault
+  - 44Billion/44billion
+  - 44Billion/44billion.net
+  - 44Billion/bitmap
+  - 44Billion/blobbi
+  - 44Billion/coracle
+  - 44Billion/ditto
+  - 44Billion/divine
+  - 44Billion/fevela
+  - 44Billion/flotilla
+  - 44Billion/grimoire
+  - 44Billion/jumble
+  - 44Billion/nappstore
+  - 44Billion/nappup
+  - 44Billion/nmmr
+  - 44Billion/nosotros
+  - 44Billion/nostria
+  - 44Billion/nostube
+  - 44Billion/primal
+  - 44Billion/treasures
+  - 44Billion/uhtml
+  - 44Billion/wisp
+  - 44Billion/yakbak
+  - 44Billion/zap-stream
   - abhay-raizada/nostr-forms
   - Anderson-Juhasc/nostrord
   - ArjenStens/nostr-epoxy-reverse-proxy
