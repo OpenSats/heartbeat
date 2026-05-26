@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+
 import { describe, expect, test } from 'bun:test';
 
 describe('netlify.toml', () => {
@@ -9,6 +11,11 @@ describe('netlify.toml', () => {
     expect(config).toContain('publish = "dist"');
     expect(config).toContain('BUN_VERSION = "1.3.3"');
     expect(pkg.scripts['deploy-build']).toBe('bun run fetch && bun run build');
+    expect(pkg.scripts['vercel-build']).toBeUndefined();
+  });
+
+  test('does not keep active legacy-provider deployment config on the Netlify branch', () => {
+    expect(existsSync('vercel.json')).toBe(false);
   });
 
   test('declares security and cache headers for the Netlify deployment', async () => {
