@@ -52,6 +52,7 @@ repos:
   - fiatjaf/khatru
   - fiatjaf/nak
   - fiatjaf/nwak
+  - fiatjaf/pyramid
   - fiatjaf/vnak
   - fiatjaf/yakbak2
   - flox1an/nostube
@@ -122,6 +123,7 @@ repos:
   - mmalmi/nostr-double-ratchet
   - MostroP2P/mostro
   - mplorentz/keydex
+  - nbd-wtf/nostr-tools
   - nodetec/captains-log
   - nogringo/nostr-mail
   - nostr-dev-kit/ndk
