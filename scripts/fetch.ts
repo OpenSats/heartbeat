@@ -1,6 +1,9 @@
-import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import { readdir, readFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { graphql } from '@octokit/graphql';
 import yaml from 'js-yaml';
 import {
@@ -25,7 +28,13 @@ type GitLabRepoTarget = {
   key: string;
 };
 
-type RepoTarget = GitHubRepoTarget | GitLabRepoTarget;
+type GitRepoTarget = {
+  provider: 'git';
+  url: string;
+  key: string;
+};
+
+type RepoTarget = GitHubRepoTarget | GitLabRepoTarget | GitRepoTarget;
 
 type LoadedConfig = {
   repos: RepoTarget[];
@@ -442,6 +451,15 @@ function normalizeRepoEntry(entry: RepoConfigEntry): RepoTarget {
     return { provider: 'github', ownerName: entry, key: entry };
   }
 
+  if (entry.provider === 'git') {
+    const url = entry.url.replace(/\/+$/, '');
+    return {
+      provider: 'git',
+      url,
+      key: url.replace(/^https?:\/\//, '').replace(/\.git$/, ''),
+    };
+  }
+
   const host = (entry.host ?? 'gitlab.com').toLowerCase();
   return {
     provider: 'gitlab',
@@ -601,6 +619,101 @@ async function fetchGitLabRepo(repo: GitLabRepoTarget): Promise<Event[]> {
   ];
 }
 
+const execFileAsync = promisify(execFile);
+const FIELD_SEP = '\x1f';
+const RECORD_SEP = '\x1e';
+
+async function git(args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, { maxBuffer: 16 * 1024 * 1024 });
+  return stdout;
+}
+
+/**
+ * Fetches activity from a plain git remote (e.g. cgit instances like
+ * git.zx2c4.com) by making a shallow bare clone and reading the log.
+ * Only commits and tags are available; there is no PR/issue API.
+ */
+async function fetchGitRepo(repo: GitRepoTarget): Promise<Event[]> {
+  const dir = await mkdtemp(join(tmpdir(), 'heartbeat-git-'));
+  try {
+    try {
+      // --filter is ignored with a warning by servers without partial
+      // clone support, so it is a free optimization where available.
+      await git([
+        'clone',
+        '--bare',
+        '--quiet',
+        '--single-branch',
+        '--filter=tree:0',
+        `--shallow-since=${WINDOW_DAYS + 1} days ago`,
+        repo.url,
+        dir,
+      ]);
+    } catch (err) {
+      // A shallow clone of a repo with no commits inside the window fails
+      // with "fatal: error processing shallow info".
+      if (String(err).includes('error processing shallow info')) {
+        console.warn(`! ${repo.key}: no commits in window, skipping`);
+        return [];
+      }
+      throw err;
+    }
+
+    const log = await git([
+      '-C',
+      dir,
+      'log',
+      `--max-count=${COMMITS_PER_REPO}`,
+      `--format=%H${FIELD_SEP}%h${FIELD_SEP}%cI${FIELD_SEP}%an${FIELD_SEP}%s${RECORD_SEP}`,
+    ]);
+    const commits = log
+      .split(RECORD_SEP)
+      .map((record) => record.trim())
+      .filter(Boolean)
+      .map((record) => {
+        const [oid, shortId, timestamp, author, subject] = record.split(FIELD_SEP);
+        return makeEvent({
+          repo: repo.key,
+          type: 'commit',
+          nativeId: oid,
+          timestamp,
+          actor: author || 'unknown',
+          title: subject ?? '',
+          url: `${repo.url}/commit/?id=${oid}`,
+          shortId,
+        });
+      });
+
+    const tagsOut = await git([
+      '-C',
+      dir,
+      'for-each-ref',
+      'refs/tags',
+      `--format=%(refname:short)${FIELD_SEP}%(creatordate:iso-strict)${FIELD_SEP}%(taggername)`,
+    ]);
+    const tags = tagsOut
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [tag, timestamp, tagger] = line.split(FIELD_SEP);
+        return makeEvent({
+          repo: repo.key,
+          type: 'release',
+          nativeId: tag,
+          timestamp,
+          actor: tagger || 'unknown',
+          title: tag,
+          url: `${repo.url}/tag/?h=${encodeURIComponent(tag)}`,
+          shortId: tag,
+        });
+      });
+
+    return [...commits, ...tags];
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   const config = await loadConfig();
   const token = getGitHubToken(config.repos.some((repo) => repo.provider === 'github'));
@@ -615,7 +728,9 @@ async function main() {
       const events =
         repo.provider === 'github'
           ? await fetchGitHubRepo(client!, repo)
-          : await fetchGitLabRepo(repo);
+          : repo.provider === 'gitlab'
+            ? await fetchGitLabRepo(repo)
+            : await fetchGitRepo(repo);
       const recent = events.filter((e) => Date.parse(e.timestamp) >= cutoff);
       console.log(`  ${repo.key}: ${recent.length} events (of ${events.length} fetched)`);
       all.push(...recent);

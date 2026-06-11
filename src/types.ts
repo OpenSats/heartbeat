@@ -45,7 +45,12 @@ const GitLabRepoSchema = z.object({
     .optional(),
 });
 
-export const RepoConfigEntrySchema = z.union([GitHubRepoSchema, GitLabRepoSchema]);
+const GitRepoSchema = z.object({
+  provider: z.literal('git'),
+  url: z.string().regex(/^https?:\/\/\S+$/, 'expected an http(s) clone URL'),
+});
+
+export const RepoConfigEntrySchema = z.union([GitHubRepoSchema, GitLabRepoSchema, GitRepoSchema]);
 export type RepoConfigEntry = z.infer<typeof RepoConfigEntrySchema>;
 
 export const ConfigSchema = z.object({
