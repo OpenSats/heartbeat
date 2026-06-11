@@ -28,7 +28,69 @@ repos:
   - ContextVM/cvmi
   - coracle-social/coracle
   - provider: gitlab
+    repo: lightning-signer/lightning-signer.gitlab.io
+  - provider: gitlab
+    repo: lightning-signer/lnrod
+  - provider: gitlab
+    repo: lightning-signer/validating-lightning-signer
+  - provider: gitlab
+    repo: lightning-signer/vls-container
+  - provider: gitlab
+    repo: sebastix-group/nostr/nostr-ads
+  - provider: gitlab
+    repo: sebastix-group/nostr/nostrver.se
+  - provider: gitlab
+    repo: soapbox-pub/developer-mcp
+  - provider: gitlab
+    repo: soapbox-pub/dirk
+  - provider: gitlab
     repo: soapbox-pub/ditto
+  - provider: gitlab
+    repo: soapbox-pub/ditto-playwright
+  - provider: gitlab
+    repo: soapbox-pub/ditto-relay
+  - provider: gitlab
+    repo: soapbox-pub/ditto-server
+  - provider: gitlab
+    repo: soapbox-pub/eclipse
+  - provider: gitlab
+    repo: soapbox-pub/getstacks.dev
+  - provider: gitlab
+    repo: soapbox-pub/knox
+  - provider: gitlab
+    repo: soapbox-pub/mkstack
+  - provider: gitlab
+    repo: soapbox-pub/mkstack-nsp
+  - provider: gitlab
+    repo: soapbox-pub/mostr
+  - provider: gitlab
+    repo: soapbox-pub/nostr-machina
+  - provider: gitlab
+    repo: soapbox-pub/nostrbook
+  - provider: gitlab
+    repo: soapbox-pub/nostrbook-mcp
+  - provider: gitlab
+    repo: soapbox-pub/nostrhub
+  - provider: gitlab
+    repo: soapbox-pub/nostrify
+  - provider: gitlab
+    repo: soapbox-pub/shakespeare
+  - provider: gitlab
+    repo: soapbox-pub/shakespeare-ai
+  - provider: gitlab
+    repo: soapbox-pub/sheila
+  - provider: gitlab
+    repo: soapbox-pub/soapbox
+  - provider: gitlab
+    repo: soapbox-pub/stacks-cli
+  - provider: gitlab
+    repo: soapbox-pub/stickynotes
+  - provider: gitlab
+    repo: soapbox-pub/strfry-policies
+  - provider: gitlab
+    repo: soapbox-pub/tribes-cli
+  - provider: gitlab
+    repo: soapbox-pub/warpzone
   - damus-io/damus
   - damus-io/notedeck
   - DanConwayDev/ngit-cli
