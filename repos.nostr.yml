@@ -27,6 +27,8 @@ repos:
   - ContextVM/contextvm-docs
   - ContextVM/cvmi
   - coracle-social/coracle
+  - provider: gitlab
+    repo: soapbox-pub/ditto
   - damus-io/damus
   - damus-io/notedeck
   - DanConwayDev/ngit-cli
