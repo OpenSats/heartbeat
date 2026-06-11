@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for plain git remotes (`provider: git`) via shallow clones, e.g.
+  the WireGuard repos on [git.zx2c4.com](https://git.zx2c4.com/). Commits
+  and tags only; links use cgit-style URLs.
+- WireGuard repos tracked in the general fund.
+
 ## [0.1.0] - 2026-04-29
 
 First tagged release. Heartbeat is a static activity dashboard that renders

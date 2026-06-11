@@ -1,7 +1,8 @@
 # heartbeat
 
-Static activity dashboard for a set of GitHub and GitLab repos. Renders
-commits, PRs, issues, and releases as a `git log --oneline`-style timeline.
+Static activity dashboard for a set of GitHub, GitLab, and plain git repos.
+Renders commits, PRs, issues, and releases as a `git log --oneline`-style
+timeline.
 
 Live at [heartbeat.opensats.org](https://heartbeat.opensats.org/)
 
@@ -9,8 +10,9 @@ A build-time fetcher pulls activity data and writes `public/data/events.json`.
 The browser never talks to GitHub or GitLab directly, so visitors don't burn
 any rate-limit budget.
 
-Today GitHub and public GitLab repos are wired up. The plan is to also pull
-from Gitea and nostr-native hosts like
+Today GitHub, public GitLab, and plain git remotes (e.g. cgit hosts like
+[git.zx2c4.com](https://git.zx2c4.com/)) are wired up. The plan is to also
+pull from Gitea and nostr-native hosts like
 [gitworkshop.dev](https://gitworkshop.dev/).
 
 ## Develop
@@ -38,7 +40,13 @@ repos:
   - provider: gitlab
     repo: group/project
     # host: gitlab.com
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-tools
 ```
+
+Plain git repos are fetched with a shallow `git clone`, so only commits and
+tags show up (there are no PRs or issues on a bare remote). Event links use
+cgit-style URLs (`<url>/commit/?id=<hash>`).
 
 Knobs (time window, page sizes) live at the top of
 [`scripts/fetch.ts`](scripts/fetch.ts).
