@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { Event } from '../types';
 import { EVENT_TYPE_META } from '../eventTypes';
-import { RepoLabel } from './RepoLabel';
+import { displayRepo, RepoLabel } from './RepoLabel';
 
 type Props = {
   event: Event;
@@ -15,18 +15,20 @@ function FilterButton({
   value,
   onSelect,
   className,
+  title,
   children,
 }: {
   value: string;
   onSelect?: (value: string) => void;
   className: string;
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={() => onSelect?.(value)}
-      title={`filter by ${value}`}
+      title={title ?? `filter by ${value}`}
       className={`${FILTER_BUTTON_BASE} ${className}`}
     >
       {children}
@@ -57,6 +59,7 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       <FilterButton
         value={event.repo}
         onSelect={onSelectRepo}
+        title={`filter by ${displayRepo(event.repo)}`}
         className="text-zinc-300 sm:text-zinc-500 hover:text-zinc-300 min-w-0 max-w-[40vw] sm:max-w-[14rem]"
       >
         <RepoLabel repo={event.repo} />
