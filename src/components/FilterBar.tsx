@@ -3,7 +3,7 @@ import { EVENT_TYPES, type EventType } from '../types';
 import { EVENT_TYPE_META } from '../eventTypes';
 import type { FilterControl } from '../lib/useUrlSet';
 import { useUrlString } from '../lib/useUrlString';
-import { RepoLabel } from './RepoLabel';
+import { displayRepo, RepoLabel } from './RepoLabel';
 
 const CHIP_BASE = 'px-2 py-1 sm:py-0.5 text-xs rounded border transition';
 const CHIP_IDLE = 'border-zinc-800 bg-transparent text-zinc-500';
@@ -140,7 +140,7 @@ export function FilterBar({
         key={r}
         active={has(repoFilter.selected, r)}
         onClick={() => repoFilter.toggle(r)}
-        title={r}
+        title={displayRepo(r)}
       >
         <RepoLabel repo={r} />
       </Chip>
@@ -190,11 +190,7 @@ export function FilterBar({
           title="reset all filters"
           aria-label="reset all filters"
         >
-          <img
-            src={markUrl}
-            alt=""
-            className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]"
-          />
+          <img src={markUrl} alt="" className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]" />
           <h1 className="text-zinc-100 text-base font-medium">heartbeat</h1>
         </button>
         <a

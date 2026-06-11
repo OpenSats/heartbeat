@@ -34,8 +34,22 @@ export const DatasetSchema = z.object({
 });
 export type Dataset = z.infer<typeof DatasetSchema>;
 
+const GitHubRepoSchema = z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/name"');
+
+const GitLabRepoSchema = z.object({
+  provider: z.literal('gitlab'),
+  repo: z.string().regex(/^[^/\s]+(?:\/[^/\s]+)+$/, 'expected "group/project" or subgroup path'),
+  host: z
+    .string()
+    .regex(/^[^/\s]+$/, 'expected a bare host like "gitlab.com"')
+    .optional(),
+});
+
+export const RepoConfigEntrySchema = z.union([GitHubRepoSchema, GitLabRepoSchema]);
+export type RepoConfigEntry = z.infer<typeof RepoConfigEntrySchema>;
+
 export const ConfigSchema = z.object({
   fund: z.string().optional(),
-  repos: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/name"')),
+  repos: z.array(RepoConfigEntrySchema),
 });
 export type Config = z.infer<typeof ConfigSchema>;
