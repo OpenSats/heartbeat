@@ -51,9 +51,13 @@ repos:
   - fiatjaf/js-eventstore-benchmark
   - fiatjaf/khatru
   - fiatjaf/nak
+  - fiatjaf/narr
+  - fiatjaf/nos2x
   - fiatjaf/nwak
   - fiatjaf/pyramid
+  - fiatjaf/relayer
   - fiatjaf/vnak
+  - fiatjaf/window.nostr.js
   - fiatjaf/yakbak2
   - flox1an/nostube
   - Fonta1n3/FullyNoded
