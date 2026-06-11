@@ -195,3 +195,23 @@ repos:
   - zerosync/zerosync
   - zeugmaster/CashuSwift
   - zeugmaster/macadamia
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-android
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-apple
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-freebsd
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-go
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-linux-compat
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-nt
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-openbsd
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-rs
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-tools
+  - provider: git
+    url: https://git.zx2c4.com/wireguard-windows
