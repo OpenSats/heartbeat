@@ -45,12 +45,26 @@ const GitLabRepoSchema = z.object({
     .optional(),
 });
 
+const ForgejoRepoSchema = z.object({
+  provider: z.literal('forgejo'),
+  repo: z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/name"'),
+  host: z
+    .string()
+    .regex(/^[^/\s]+$/, 'expected a bare host like "codeberg.org"')
+    .optional(),
+});
+
 const GitRepoSchema = z.object({
   provider: z.literal('git'),
   url: z.string().regex(/^https?:\/\/\S+$/, 'expected an http(s) clone URL'),
 });
 
-export const RepoConfigEntrySchema = z.union([GitHubRepoSchema, GitLabRepoSchema, GitRepoSchema]);
+export const RepoConfigEntrySchema = z.union([
+  GitHubRepoSchema,
+  GitLabRepoSchema,
+  ForgejoRepoSchema,
+  GitRepoSchema,
+]);
 export type RepoConfigEntry = z.infer<typeof RepoConfigEntrySchema>;
 
 export const ConfigSchema = z.object({
