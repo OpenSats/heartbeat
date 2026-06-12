@@ -1,8 +1,8 @@
 # heartbeat
 
-Static activity dashboard for a set of GitHub, GitLab, and plain git repos.
-Renders commits, PRs, issues, and releases as a `git log --oneline`-style
-timeline.
+Static activity dashboard for a set of GitHub, GitLab, Forgejo, and plain
+git repos. Renders commits, PRs, issues, and releases as a
+`git log --oneline`-style timeline.
 
 Live at [heartbeat.opensats.org](https://heartbeat.opensats.org/)
 
@@ -10,9 +10,11 @@ A build-time fetcher pulls activity data and writes `public/data/events.json`.
 The browser never talks to GitHub or GitLab directly, so visitors don't burn
 any rate-limit budget.
 
-Today GitHub, public GitLab, and plain git remotes (e.g. cgit hosts like
-[git.zx2c4.com](https://git.zx2c4.com/)) are wired up. The plan is to also
-pull from Gitea and nostr-native hosts like
+Today GitHub, public GitLab, Forgejo/Gitea instances (e.g.
+[codeberg.org](https://codeberg.org/) or
+[git.rust-bitcoin.org](https://git.rust-bitcoin.org/)), and plain git
+remotes (e.g. cgit hosts like [git.zx2c4.com](https://git.zx2c4.com/)) are
+wired up. The plan is to also pull from nostr-native hosts like
 [gitworkshop.dev](https://gitworkshop.dev/).
 
 ## Develop
@@ -26,7 +28,7 @@ npm run fetch                       # writes public/data/events.json
 npm run dev
 ```
 
-Public GitLab repos are fetched without auth.
+Public GitLab and Forgejo repos are fetched without auth.
 
 ## Configure
 
@@ -40,9 +42,15 @@ repos:
   - provider: gitlab
     repo: group/project
     # host: gitlab.com
+  - provider: forgejo
+    repo: owner/repo
+    # host: codeberg.org
   - provider: git
     url: https://git.zx2c4.com/wireguard-tools
 ```
+
+Forgejo (and Gitea) instances are queried via their REST API; commits,
+PRs, issues, and releases all show up, same as GitHub.
 
 Plain git repos are fetched with a shallow `git clone`, so only commits and
 tags show up (there are no PRs or issues on a bare remote). Event links use
