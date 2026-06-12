@@ -27,6 +27,8 @@ repos:
   - ContextVM/contextvm-docs
   - ContextVM/cvmi
   - coracle-social/coracle
+  - coracle-social/pomade
+  - coracle-social/welshman
   - provider: gitlab
     repo: lightning-signer/lightning-signer.gitlab.io
   - provider: gitlab
