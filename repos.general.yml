@@ -195,6 +195,15 @@ repos:
   - zerosync/zerosync
   - zeugmaster/CashuSwift
   - zeugmaster/macadamia
+  - provider: forgejo
+    repo: rust-bitcoin/rust-bitcoin-maintainer-tools
+    host: git.rust-bitcoin.org
+  - provider: forgejo
+    repo: rust-bitcoin/rust-psbt
+    host: git.rust-bitcoin.org
+  - provider: forgejo
+    repo: rust-bitcoin/rust-secp256k1
+    host: git.rust-bitcoin.org
   - provider: git
     url: https://git.zx2c4.com/wireguard-android
   - provider: git

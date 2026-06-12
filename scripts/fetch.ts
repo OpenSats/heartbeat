@@ -28,13 +28,20 @@ type GitLabRepoTarget = {
   key: string;
 };
 
+type ForgejoRepoTarget = {
+  provider: 'forgejo';
+  ownerName: string;
+  host: string;
+  key: string;
+};
+
 type GitRepoTarget = {
   provider: 'git';
   url: string;
   key: string;
 };
 
-type RepoTarget = GitHubRepoTarget | GitLabRepoTarget | GitRepoTarget;
+type RepoTarget = GitHubRepoTarget | GitLabRepoTarget | ForgejoRepoTarget | GitRepoTarget;
 
 type LoadedConfig = {
   repos: RepoTarget[];
@@ -136,6 +143,45 @@ type GitLabMergeRequestNode = {
 type GitLabGraphQlResponse = {
   data?: { project: { mergeRequests: { nodes: GitLabMergeRequestNode[] } } | null };
   errors?: Array<{ message: string }>;
+};
+
+type ForgejoUser = { login: string | null } | null;
+type ForgejoCommitNode = {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: { name: string | null; date: string } | null;
+    committer: { name: string | null; date: string } | null;
+  };
+  author: ForgejoUser;
+};
+type ForgejoPullNode = {
+  number: number;
+  title: string;
+  html_url: string;
+  created_at: string;
+  merged_at: string | null;
+  closed_at: string | null;
+  merged: boolean;
+  user: ForgejoUser;
+  merged_by?: ForgejoUser;
+};
+type ForgejoIssueNode = {
+  number: number;
+  title: string;
+  html_url: string;
+  created_at: string;
+  closed_at: string | null;
+  user: ForgejoUser;
+};
+type ForgejoReleaseNode = {
+  tag_name: string;
+  name: string | null;
+  html_url: string;
+  published_at: string | null;
+  created_at: string;
+  author: ForgejoUser;
 };
 
 const REPO_QUERY = /* GraphQL */ `
@@ -441,6 +487,91 @@ function gitlabMergeRequestToEvents(repo: string, n: GitLabMergeRequestNode): Ev
   return events;
 }
 
+const forgejoLogin = (a: ForgejoUser) => a?.login ?? 'unknown';
+
+function forgejoCommitToEvents(repo: string, n: ForgejoCommitNode): Event[] {
+  return [
+    makeEvent({
+      repo,
+      type: 'commit',
+      nativeId: n.sha,
+      timestamp: n.commit.committer?.date ?? n.commit.author?.date ?? '',
+      actor: n.author?.login ?? n.commit.author?.name ?? 'unknown',
+      title: n.commit.message.split('\n')[0],
+      url: n.html_url,
+      shortId: n.sha.slice(0, 7),
+    }),
+  ];
+}
+
+function forgejoPullToEvents(repo: string, n: ForgejoPullNode): Event[] {
+  const common = {
+    repo,
+    nativeId: String(n.number),
+    title: n.title,
+    url: n.html_url,
+    shortId: `#${n.number}`,
+  };
+  const events: Event[] = [
+    makeEvent({
+      ...common,
+      type: 'pr_opened',
+      timestamp: n.created_at,
+      actor: forgejoLogin(n.user),
+    }),
+  ];
+  if (n.merged && n.merged_at) {
+    events.push(
+      makeEvent({
+        ...common,
+        type: 'pr_merged',
+        timestamp: n.merged_at,
+        actor: forgejoLogin(n.merged_by ?? n.user),
+      }),
+    );
+  } else if (n.closed_at) {
+    events.push(
+      makeEvent({
+        ...common,
+        type: 'pr_closed',
+        timestamp: n.closed_at,
+        actor: forgejoLogin(n.user),
+      }),
+    );
+  }
+  return events;
+}
+
+function forgejoIssueToEvents(repo: string, n: ForgejoIssueNode): Event[] {
+  const common = {
+    repo,
+    nativeId: String(n.number),
+    title: n.title,
+    url: n.html_url,
+    shortId: `#${n.number}`,
+    actor: forgejoLogin(n.user),
+  };
+  const events: Event[] = [makeEvent({ ...common, type: 'issue_opened', timestamp: n.created_at })];
+  if (n.closed_at)
+    events.push(makeEvent({ ...common, type: 'issue_closed', timestamp: n.closed_at }));
+  return events;
+}
+
+function forgejoReleaseToEvents(repo: string, n: ForgejoReleaseNode): Event[] {
+  return [
+    makeEvent({
+      repo,
+      type: 'release',
+      nativeId: n.tag_name,
+      timestamp: n.published_at ?? n.created_at,
+      actor: forgejoLogin(n.author),
+      title: n.name || n.tag_name,
+      url: n.html_url,
+      shortId: n.tag_name,
+    }),
+  ];
+}
+
 function fundFromFilename(file: string): string {
   const m = file.match(/^repos\.(.+)\.ya?ml$/i);
   return m ? m[1].toLowerCase() : 'general';
@@ -457,6 +588,16 @@ function normalizeRepoEntry(entry: RepoConfigEntry): RepoTarget {
       provider: 'git',
       url,
       key: url.replace(/^https?:\/\//, '').replace(/\.git$/, ''),
+    };
+  }
+
+  if (entry.provider === 'forgejo') {
+    const host = (entry.host ?? 'codeberg.org').toLowerCase();
+    return {
+      provider: 'forgejo',
+      ownerName: entry.repo,
+      host,
+      key: `${host}/${entry.repo}`,
     };
   }
 
@@ -536,7 +677,7 @@ async function fetchGitHubRepo(
   ];
 }
 
-async function gitlabJson<T>(url: string, init?: RequestInit): Promise<T> {
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
     headers: {
@@ -563,7 +704,7 @@ async function fetchGitLabMergeRequestsByState(
   const body = JSON.stringify({
     query: GITLAB_MERGE_REQUESTS_QUERY(repo.fullPath, PRS_PER_REPO, state),
   });
-  const data = await gitlabJson<GitLabGraphQlResponse>(`https://${repo.host}/api/graphql`, {
+  const data = await fetchJson<GitLabGraphQlResponse>(`https://${repo.host}/api/graphql`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body,
@@ -581,11 +722,11 @@ async function fetchGitLabRepo(repo: GitLabRepoTarget): Promise<Event[]> {
 
   const [commitsRes, issuesRes, tagsRes, openedMrsRes, mergedMrsRes, closedMrsRes] =
     await Promise.allSettled([
-      gitlabJson<GitLabCommitNode[]>(`${base}/repository/commits?per_page=${COMMITS_PER_REPO}`),
-      gitlabJson<GitLabIssueNode[]>(
+      fetchJson<GitLabCommitNode[]>(`${base}/repository/commits?per_page=${COMMITS_PER_REPO}`),
+      fetchJson<GitLabIssueNode[]>(
         `${base}/issues?per_page=${ISSUES_PER_REPO}&state=all&order_by=updated_at&sort=desc`,
       ),
-      gitlabJson<GitLabTagNode[]>(`${base}/repository/tags?per_page=${RELEASES_PER_REPO}`),
+      fetchJson<GitLabTagNode[]>(`${base}/repository/tags?per_page=${RELEASES_PER_REPO}`),
       fetchGitLabMergeRequestsByState(repo, 'opened'),
       fetchGitLabMergeRequestsByState(repo, 'merged'),
       fetchGitLabMergeRequestsByState(repo, 'closed'),
@@ -616,6 +757,59 @@ async function fetchGitLabRepo(repo: GitLabRepoTarget): Promise<Event[]> {
     ...mergeRequests.flatMap((n) => gitlabMergeRequestToEvents(repo.key, n)),
     ...issues.flatMap((n) => gitlabIssueToEvents(repo.key, n)),
     ...tags.flatMap((n) => gitlabTagToEvents(repo, n)),
+  ];
+}
+
+// Some Forgejo instances (e.g. git.rust-bitcoin.org) sit behind an anti-bot
+// proxy that only lets through CLI user agents like curl, wget, and git.
+// A curl-prefixed UA passes while still identifying us in the comment.
+const FORGEJO_USER_AGENT = 'curl/8 (opensats-heartbeat, +https://heartbeat.opensats.org)';
+
+function forgejoJson<T>(url: string): Promise<T> {
+  return fetchJson<T>(url, { headers: { 'user-agent': FORGEJO_USER_AGENT } });
+}
+
+/**
+ * Fetches activity from a Forgejo (or Gitea) instance via its
+ * GitHub-compatible REST API (e.g. codeberg.org, git.rust-bitcoin.org).
+ */
+async function fetchForgejoRepo(repo: ForgejoRepoTarget): Promise<Event[]> {
+  const base = `https://${repo.host}/api/v1/repos/${repo.ownerName}`;
+
+  const [commitsRes, pullsRes, issuesRes, releasesRes] = await Promise.allSettled([
+    forgejoJson<ForgejoCommitNode[]>(
+      `${base}/commits?limit=${COMMITS_PER_REPO}&stat=false&verification=false&files=false`,
+    ),
+    forgejoJson<ForgejoPullNode[]>(
+      `${base}/pulls?state=all&sort=recentupdate&limit=${PRS_PER_REPO}`,
+    ),
+    forgejoJson<ForgejoIssueNode[]>(
+      `${base}/issues?state=all&type=issues&sort=recentupdate&limit=${ISSUES_PER_REPO}`,
+    ),
+    forgejoJson<ForgejoReleaseNode[]>(`${base}/releases?limit=${RELEASES_PER_REPO}`),
+  ]);
+
+  const warnIfRejected = (label: string, result: PromiseSettledResult<unknown>) => {
+    if (result.status === 'rejected') {
+      console.warn(`! ${repo.key}: failed to fetch Forgejo ${label}: ${result.reason}`);
+    }
+  };
+
+  warnIfRejected('commits', commitsRes);
+  warnIfRejected('pull requests', pullsRes);
+  warnIfRejected('issues', issuesRes);
+  warnIfRejected('releases', releasesRes);
+
+  const commits = commitsRes.status === 'fulfilled' ? commitsRes.value : [];
+  const pulls = pullsRes.status === 'fulfilled' ? pullsRes.value : [];
+  const issues = issuesRes.status === 'fulfilled' ? issuesRes.value : [];
+  const releases = releasesRes.status === 'fulfilled' ? releasesRes.value : [];
+
+  return [
+    ...commits.flatMap((n) => forgejoCommitToEvents(repo.key, n)),
+    ...pulls.flatMap((n) => forgejoPullToEvents(repo.key, n)),
+    ...issues.flatMap((n) => forgejoIssueToEvents(repo.key, n)),
+    ...releases.flatMap((n) => forgejoReleaseToEvents(repo.key, n)),
   ];
 }
 
@@ -730,7 +924,9 @@ async function main() {
           ? await fetchGitHubRepo(client!, repo)
           : repo.provider === 'gitlab'
             ? await fetchGitLabRepo(repo)
-            : await fetchGitRepo(repo);
+            : repo.provider === 'forgejo'
+              ? await fetchForgejoRepo(repo)
+              : await fetchGitRepo(repo);
       const recent = events.filter((e) => Date.parse(e.timestamp) >= cutoff);
       console.log(`  ${repo.key}: ${recent.length} events (of ${events.length} fetched)`);
       all.push(...recent);
