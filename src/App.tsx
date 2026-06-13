@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { loadEvents } from './lib/loadEvents';
 import { useUrlSet } from './lib/useUrlSet';
 import { Timeline } from './components/Timeline';
@@ -54,6 +54,9 @@ export function App() {
         inSet(actorFilter.selected, e.actor),
     );
   }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
+
+  // Defer the timeline so filter input/chips stay responsive.
+  const deferredFiltered = useDeferredValue(filtered);
 
   const { set: setRepoSelection } = repoFilter;
   const { set: setActorSelection } = actorFilter;
@@ -116,7 +119,7 @@ export function App() {
           actorFilter={actorFilter}
         />
       </div>
-      <Timeline events={filtered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
+      <Timeline events={deferredFiltered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
       <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900 space-y-1">
         <div>
           {fmt(data.events.length)} events: {statParts.join(', ')}
