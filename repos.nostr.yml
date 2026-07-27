@@ -10,10 +10,12 @@ repos:
   - atrifat/nostr-filter-relay
   - AustinKelsay/nip55-ios-test
   - barrydeen/algo-relay
+  - barrydeen/dark-wisp-android
   - barrydeen/haven
   - barrydeen/moar
   - barrydeen/nostrarchives-api
   - barrydeen/wisp
+  - barrydeen/wisp-ios
   - barrydeen/wot-relay
   - believethehype/dvm
   - blackcoffeexbt/hardware-nostr-connect-device
