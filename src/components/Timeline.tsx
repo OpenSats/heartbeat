@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Event } from '../types';
 import { EventRow } from './EventRow';
 
@@ -7,6 +7,11 @@ type Props = {
   onSelectRepo?: (repo: string) => void;
   onSelectActor?: (actor: string) => void;
 };
+
+// Render incrementally; more rows load as the bottom sentinel nears view.
+const INITIAL_VISIBLE = 200;
+const PAGE = 200;
+const PREFETCH_MARGIN = '1200px 0px';
 
 function groupByDay(events: Event[]): Array<[string, Event[]]> {
   const groups = new Map<string, Event[]>();
@@ -23,7 +28,39 @@ function groupByDay(events: Event[]): Array<[string, Event[]]> {
 }
 
 export function Timeline({ events, onSelectRepo, onSelectActor }: Props) {
-  const groups = useMemo(() => groupByDay(events), [events]);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+
+  // Reset paging during render when the filtered set changes.
+  const [prevEvents, setPrevEvents] = useState(events);
+  if (events !== prevEvents) {
+    setPrevEvents(events);
+    setVisibleCount(INITIAL_VISIBLE);
+  }
+
+  const visibleEvents = useMemo(
+    () => (visibleCount >= events.length ? events : events.slice(0, visibleCount)),
+    [events, visibleCount],
+  );
+  const groups = useMemo(() => groupByDay(visibleEvents), [visibleEvents]);
+
+  const hasMore = visibleCount < events.length;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Reconnect per page so intersection is re-evaluated until the sentinel clears.
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => c + PAGE);
+        }
+      },
+      { rootMargin: PREFETCH_MARGIN },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, visibleCount]);
 
   if (events.length === 0) {
     return <div className="text-zinc-500 px-2 py-8">No events match the current filters.</div>;
@@ -49,6 +86,7 @@ export function Timeline({ events, onSelectRepo, onSelectActor }: Props) {
           </div>
         </section>
       ))}
+      {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
     </div>
   );
 }
