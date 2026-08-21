@@ -20,6 +20,7 @@ repos:
   - bitaxeorg/ultraHex
   - bitcoin-core/gui-qml
   - bitcoin-dev-project/warnet
+  - bitcoin/bips
   - bitcoin/bitcoin
   - bitcoindevkit/bdk
   - bitcoinerlab/bitcoinjs-message
