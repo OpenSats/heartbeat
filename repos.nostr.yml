@@ -259,6 +259,7 @@ repos:
   - trbouma/safebox
   - Trustroots/nostroots
   - TsukemonoGit/lumilumi
+  - v0l/zap.stream
   - vertex-lab/crawler_v2
   - vertex-lab/nostr-sqlite
   - vertex-lab/npub.world
