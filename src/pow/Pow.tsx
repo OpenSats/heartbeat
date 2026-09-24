@@ -414,7 +414,11 @@ export function Pow() {
   const loading = sources.some((s) => !results[s.key] || results[s.key].refreshing);
   const coverage = (date: string, platform: 'github' | 'nostr') => {
     const relevant = sources.filter((s) =>
-      platform === 'nostr' ? s.kind === 'nostr' : s.kind !== 'nostr',
+      platform === 'nostr'
+        ? s.kind === 'nostr'
+        : filter === 'repo'
+          ? s.kind === 'repo'
+          : s.kind !== 'nostr',
     );
     const from = Date.parse(`${date}T00:00:00Z`);
     const to = from + 86400000 - 1;
@@ -635,8 +639,14 @@ export function Pow() {
         <div className="flex flex-col-reverse lg:flex-row items-start">
           <div className="min-w-0 flex-1 w-full">
             {(['github', 'nostr'] as const).map((platform) => {
+              if (filter !== 'all' && platform !== (filter === 'repo' ? 'github' : filter))
+                return null;
               const platformSources = sources.filter((source) =>
-                platform === 'nostr' ? source.kind === 'nostr' : source.kind !== 'nostr',
+                platform === 'nostr'
+                  ? source.kind === 'nostr'
+                  : filter === 'repo'
+                    ? source.kind === 'repo'
+                    : source.kind !== 'nostr',
               );
               if (!platformSources.length) return null;
               const activity = new Map(
@@ -652,10 +662,12 @@ export function Pow() {
                   year={year}
                   platform={platform}
                   dates={[...activity.values()].map((event) => event.timestamp.slice(0, 10))}
-                  selected={filter === platform ? day : ''}
+                  selected={
+                    filter === platform || (filter === 'repo' && platform === 'github') ? day : ''
+                  }
                   onSelect={(date) => {
                     setDay(date);
-                    setFilter(date ? platform : 'all');
+                    if (date && filter !== 'repo') setFilter(platform);
                     setKind('all');
                     setQuery('');
                     setActor('');
