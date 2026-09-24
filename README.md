@@ -12,6 +12,29 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
+An `npub` in `p=` loads both text notes and ngit activity. Use `ngit=npub…`
+to load code activity alone. NIP-34 patches, PRs, PR updates, issues, NIP-22 code
+comments, status messages, repository announcements and ref updates appear in an
+amber ngit/GRASP heatmap. All events are signature-checked and attributed to their
+signer. A published patch or ref update is counted as one event, not as a Git commit.
+
+`repo=` also accepts `nostr://npub/identifier`, `nostr://npub/relay/identifier`,
+NIP-19 repository `naddr` values, and GRASP HTTPS URLs ending in
+`/npub/identifier.git`. These show repository context from all contributors.
+Repository comments/statuses without repository address tags can be missing.
+NIP-05 clone addresses and raw Git object/commit history are not supported yet.
+
+The ngit collector discovers public relays from signed GRASP lists, outbox lists,
+and repository announcements, with `relay.ngit.dev`, `nos.lol`, and `relay.damus.io`
+as discovery relays. Relay discovery is cached per source for 24 hours. Monthly
+pagination checkpoints use the existing queue and source cache. Public WSS relays
+on port 443 are supported; resolved IPs are checked and pinned before connecting.
+No new credentials or database migration are required.
+
+Relay-backed heatmaps remain striped: relays can omit data, and replaceable
+repository state does not provide a complete history of pushes. Previously seen
+ngit events are retained when refreshing a month, even if a relay later drops them.
+
 The browser defaults to 365 days and queues all requested months up front. A year selector
 loads calendar years back to 2008, stored as `year=2025` in the view URL. Each
 platform has a separate heatmap, yearly total, and coverage indicators.
