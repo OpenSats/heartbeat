@@ -495,40 +495,50 @@ export function Pow() {
             </a>
             <span className="text-xs text-zinc-500">/ pow</span>
           </div>
-          <button
-            className="p-1 text-zinc-500 hover:text-zinc-300"
-            aria-label={copied ? 'Link copied' : 'Copy link'}
-            title={copied ? 'Link copied' : 'Copy link'}
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(location.href)
-                .then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                })
-                .catch(() => setCopied(false));
-            }}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="flex items-center gap-3">
+            <button
+              className="p-1 text-zinc-500 hover:text-zinc-300"
+              aria-label={copied ? 'Link copied' : 'Copy link'}
+              title={copied ? 'Link copied' : 'Copy link'}
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(location.href)
+                  .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  })
+                  .catch(() => setCopied(false));
+              }}
             >
-              {copied ? (
-                <path d="m5 12 4 4L19 6" />
-              ) : (
-                <>
-                  <rect x="8" y="8" width="12" height="12" rx="2" />
-                  <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
-                </>
-              )}
-            </svg>
-          </button>
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {copied ? (
+                  <path d="m5 12 4 4L19 6" />
+                ) : (
+                  <>
+                    <rect x="8" y="8" width="12" height="12" rx="2" />
+                    <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+                  </>
+                )}
+              </svg>
+            </button>
+            <a
+              href="https://opensats.org"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors"
+            >
+              by OpenSats
+            </a>
+          </div>
         </div>
         {!hasSources(params) && (
           <form onSubmit={submit} className="space-y-2">
