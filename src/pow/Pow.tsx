@@ -96,8 +96,8 @@ function SourceStatus({
             if (!response.ok) throw new Error(data.error ?? 'Unable to load source.');
             chunks.set(month, data);
             publish(true);
-            if (data.refreshing && attempts++ < 25) {
-              await pause(3000);
+            if ((data.refreshing || data.snapshot?.pending?.length) && attempts++ < 200) {
+              await pause(data.snapshot?.pending?.length ? 12000 : 3000);
               continue;
             }
             if (data.error && data.retryAt && attempts++ < 2 && data.error.includes('rate limit')) {
@@ -444,7 +444,9 @@ export function Pow() {
             <span className="text-xs text-zinc-500">/ pow</span>
           </div>
           <button
-            className="text-xs text-zinc-500 hover:text-zinc-300"
+            className="p-1 text-zinc-500 hover:text-zinc-300"
+            aria-label={copied ? 'Link copied' : 'Copy link'}
+            title={copied ? 'Link copied' : 'Copy link'}
             onClick={() => {
               void navigator.clipboard
                 .writeText(location.href)

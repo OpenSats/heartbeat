@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
-import { collect } from './collect.js';
+import { collect, monthBounds } from './collect.js';
 import type { Snapshot, Source, SourceResult } from '../src/pow/model.js';
 
 export function database() {
@@ -19,16 +19,23 @@ export async function readCache(
   month: string,
 ): Promise<SourceResult & { retry: boolean }> {
   const sql = database();
-  const key = `${source.key}:v2:${month}`;
+  const key = `${source.key}:v3:${month}`;
   const rows =
     await sql`SELECT snapshot, fetched_at, retry_at, lease_until, error FROM pow_sources WHERE source_key = ${key}`;
   const row = rows[0] as Row | undefined;
   const now = Date.now();
-  const ttl = row?.snapshot?.windows?.some((w) => !w.exhaustive)
-    ? 3600000
-    : month === new Date().toISOString().slice(0, 7)
-      ? 86400000
-      : 90 * 86400000;
+  const closedMonthNeedsRefresh =
+    month !== new Date().toISOString().slice(0, 7) &&
+    !!row?.snapshot &&
+    (row.snapshot.windows?.[0]?.to ?? '') < monthBounds(month).to;
+  const ttl =
+    closedMonthNeedsRefresh || row?.snapshot?.pending?.length
+      ? 0
+      : row?.snapshot?.windows?.some((w) => !w.exhaustive)
+        ? 3600000
+        : month === new Date().toISOString().slice(0, 7)
+          ? 86400000
+          : 90 * 86400000;
   return {
     source,
     snapshot: row?.snapshot ?? null,
@@ -42,7 +49,9 @@ export async function readCache(
 }
 export async function claimRefresh(source: Source, month: string) {
   const sql = database();
-  const key = `${source.key}:v2:${month}`;
+  const key = `${source.key}:v3:${month}`;
+  const closedMonth = month !== new Date().toISOString().slice(0, 7);
+  const end = monthBounds(month).to;
   const days = month === new Date().toISOString().slice(0, 7) ? 1 : 90;
   // A single global hourly budget bounds public cache-miss abuse. No visitor or URL records.
   const budget = await sql`
@@ -56,15 +65,16 @@ export async function claimRefresh(source: Source, month: string) {
     ON CONFLICT (source_key) DO UPDATE SET lease_token = ${token}, lease_until = now() + interval '90 seconds'
     WHERE (pow_sources.lease_until IS NULL OR pow_sources.lease_until < now())
       AND (pow_sources.retry_at IS NULL OR pow_sources.retry_at < now())
-      AND (pow_sources.fetched_at IS NULL OR pow_sources.fetched_at < now() - CASE WHEN pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' THEN interval '1 hour' ELSE ${days} * interval '1 day' END)
+      AND (pow_sources.fetched_at IS NULL OR (${closedMonth} AND pow_sources.snapshot #>> '{windows,0,to}' < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR pow_sources.fetched_at < now() - CASE WHEN pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' THEN interval '1 hour' ELSE ${days} * interval '1 day' END)
     RETURNING source_key`;
   return lease.length ? token : null;
 }
 export async function refresh(source: Source, token: string, month: string) {
   const sql = database();
-  const key = `${source.key}:v2:${month}`;
+  const key = `${source.key}:v3:${month}`;
   try {
-    const snapshot = await collect(source, month);
+    const previous = await readCache(source, month);
+    const snapshot = await collect(source, month, previous.snapshot);
     // Bound a single response below Vercel's payload limit without implying full coverage.
     snapshot.events = snapshot.events.map((event) => ({
       ...event,
@@ -75,6 +85,8 @@ export async function refresh(source: Source, token: string, month: string) {
       while (snapshot.events.length && Buffer.byteLength(JSON.stringify(snapshot)) > 3_000_000)
         snapshot.events.splice(-100);
       snapshot.windows = snapshot.windows?.map((window) => ({ ...window, exhaustive: false }));
+      snapshot.pending = [];
+      snapshot.searchIncomplete = true;
       snapshot.coverage +=
         ' This unusually busy month exceeded the response size limit; coverage is incomplete.';
     }
