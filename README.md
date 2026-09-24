@@ -12,19 +12,30 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
-Snapshots stay fresh for 24 hours. Stale data is served during refresh, failed
-refreshes preserve the last snapshot and back off for 15 minutes, and a database
-lease prevents duplicate fetches. A global limit allows 120 refresh attempts per
-hour. Production and previews share this cache, so schema changes must remain
-backwards compatible. Cache budget rows older than two days are removed by the
-migration command. Successful refreshes replace bounded 90-day snapshots; this
-MVP is not a permanent archive or an incremental collector.
+The browser backfills 365 days in monthly requests and draws a daily heatmap.
+The current month stays fresh for 24 hours; finished historical months are cached
+for 90 days. Incomplete months retry after one hour. Failed requests preserve
+cached results and back off for two minutes. A database lease prevents duplicate
+fetches. Each cache key identifies one source and month; associations remain in
+the URL. Historical snapshots are occasionally revalidated for edits, deletions,
+and changes to search indexing.
 
-GitHub coverage: up to 100 authored commits and 100 authored issues/PRs from
-public search. Extra GitHub repos show all contributors, separately labeled as
-repository context. Other git hosts, reviews, and merge actions are not supported
-yet. Nostr fetches up to 200 signed kind-1 notes from each of three fixed relays;
-coverage is shown per source. Each source can succeed or fail independently.
+GitHub collection paginates commit and issue/PR search results. Intervals with
+more than 1,000 results are subdivided. A per-request budget bounds collection;
+months that hit it are marked incomplete. Reviews and merge actions are excluded.
+Extra GitHub repos include all contributors. Other git hosts are not supported.
+Nostr paginates signed kind-1 notes across three fixed relays. Its relay coverage
+can never prove inactivity. All Nostr days, unfetched periods, and incomplete
+GitHub periods are striped in the heatmap. Plain empty cells mean no indexed
+activity in the fetched GitHub categories. Today remains uncertain until complete.
+Click a day to filter the timeline. The source form is hidden when URL parameters
+are present. Nostr links use njump.to.
+
+A global limit allows 120 refresh attempts per hour. Production and previews
+share the cache, so schema changes must remain backwards compatible. Budget rows
+older than two days are removed by the migration command. Very large month
+responses are bounded at 3 MB and explicitly marked incomplete. Backfill resumes
+from cached months when the page is reopened.
 
 The page sends no combined identifiers to the API and suppresses Referer headers.
 Full page URLs can still appear in browser history and hosting access logs; do not

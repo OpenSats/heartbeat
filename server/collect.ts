@@ -203,11 +203,15 @@ function relayEvents(
             return;
           }
           const oldest = Math.min(...batch.map((e) => e.created_at));
-          if (pages >= 30 || oldest >= until) {
+          if (pages >= 30 || (oldest >= until && batch.length >= 200)) {
             finish(false);
             return;
           }
-          until = oldest; // Overlap the last second to avoid dropping equal-timestamp events.
+          until = oldest === until ? oldest - 1 : oldest;
+          if (until < since) {
+            finish(true);
+            return;
+          }
           request();
           return;
         }
