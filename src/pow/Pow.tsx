@@ -601,6 +601,30 @@ export function Pow() {
                 </button>
               ))}
             </div>
+            <div
+              className="flex flex-wrap items-center gap-1.5"
+              role="group"
+              aria-label="Activity year"
+            >
+              <span className="text-zinc-600 text-xs shrink-0 w-14">year:</span>
+              <button
+                aria-pressed={year === null}
+                className={chipClass(year === null)}
+                onClick={() => selectYear(null)}
+              >
+                last 365 days
+              </button>
+              {years.map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={year === value}
+                  className={chipClass(year === value)}
+                  onClick={() => selectYear(value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
             <label className="flex items-center gap-1.5">
               <span className="text-zinc-600 text-xs shrink-0 w-14">filter:</span>
               <input
@@ -638,7 +662,7 @@ export function Pow() {
         )}
       </div>
       {!!sources.length && (
-        <div className="flex flex-col-reverse lg:flex-row items-start">
+        <div className="w-full">
           <div className="min-w-0 flex-1 w-full">
             {(['github', 'nostr'] as const).map((platform) => {
               if (filter !== 'all' && platform !== (filter === 'repo' ? 'github' : filter))
@@ -681,28 +705,6 @@ export function Pow() {
               );
             })}
           </div>
-          <nav
-            aria-label="Activity year"
-            className="flex lg:flex-col gap-1 px-3 py-3 w-full lg:w-36 shrink-0 overflow-x-auto lg:overflow-y-auto lg:max-h-[420px] text-xs"
-          >
-            <button
-              aria-pressed={year === null}
-              className={`${chipClass(year === null)} shrink-0 text-left`}
-              onClick={() => selectYear(null)}
-            >
-              last 365 days
-            </button>
-            {years.map((value) => (
-              <button
-                key={value}
-                aria-pressed={year === value}
-                className={`${chipClass(year === value)} shrink-0 text-left`}
-                onClick={() => selectYear(value)}
-              >
-                {value}
-              </button>
-            ))}
-          </nav>
         </div>
       )}
       {!sources.length ? (
