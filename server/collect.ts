@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { collectNgit } from './ngit.js';
 import { githubSlot, githubCooldown, RetryLater } from './rate-limit.js';
 import { nip19, verifyEvent, type Event as NostrEvent } from 'nostr-tools';
 import type { Activity, SearchTask, Snapshot, Source } from '../src/pow/model.js';
@@ -238,6 +239,8 @@ export async function collect(
   month: string,
   previous?: Snapshot | null,
 ): Promise<Snapshot> {
+  if (source.kind === 'ngit' || source.kind === 'grasp')
+    return collectNgit(source, month, previous, monthBounds(month));
   if (source.kind !== 'nostr') return collectGithub(source, month, previous);
   const results = await Promise.allSettled(
     RELAYS.map((url) => relayEvents(url, source.value, month)),

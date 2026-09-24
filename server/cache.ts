@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import { RetryLater } from './rate-limit.js';
 import { collect, monthBounds } from './collect.js';
-import type { Snapshot, Source, SourceResult } from '../src/pow/model.js';
+import { hasPending, type Snapshot, type Source, type SourceResult } from '../src/pow/model.js';
 
 export function database() {
   if (!process.env.DATABASE_URL) throw new Error('Database is not configured.');
@@ -31,7 +31,7 @@ export async function readCache(
     !!row?.snapshot &&
     (row.snapshot.windows?.[0]?.to ?? '') < monthBounds(month).to;
   const ttl =
-    closedMonthNeedsRefresh || row?.snapshot?.pending?.length
+    closedMonthNeedsRefresh || hasPending(row?.snapshot)
       ? 0
       : row?.snapshot?.windows?.some((w) => !w.exhaustive)
         ? 3600000
@@ -62,7 +62,7 @@ export async function claimRefresh(source: Source, month: string) {
     ON CONFLICT (source_key) DO UPDATE SET lease_token = ${token}, lease_until = now() + interval '90 seconds'
     WHERE (pow_sources.lease_until IS NULL OR pow_sources.lease_until < now())
       AND (pow_sources.retry_at IS NULL OR pow_sources.retry_at < now())
-      AND (pow_sources.fetched_at IS NULL OR (${closedMonth} AND pow_sources.snapshot #>> '{windows,0,to}' < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR (pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' AND pow_sources.fetched_at < now() - interval '1 hour') OR (NOT ${closedMonth} AND pow_sources.fetched_at < now() - interval '24 hours'))
+      AND (pow_sources.fetched_at IS NULL OR (${closedMonth} AND pow_sources.snapshot #>> '{windows,0,to}' < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingRelays', '[]'::jsonb)) > 0 OR (pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' AND pow_sources.fetched_at < now() - interval '1 hour') OR (NOT ${closedMonth} AND pow_sources.fetched_at < now() - interval '24 hours'))
     RETURNING source_key`;
   return lease.length ? token : null;
 }
@@ -83,6 +83,7 @@ export async function refresh(source: Source, token: string, month: string) {
         snapshot.events.splice(-100);
       snapshot.windows = snapshot.windows?.map((window) => ({ ...window, exhaustive: false }));
       snapshot.pending = [];
+      snapshot.pendingRelays = [];
       snapshot.searchIncomplete = true;
       snapshot.coverage +=
         ' This unusually busy month exceeded the response size limit; coverage is incomplete.';

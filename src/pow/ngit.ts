@@ -76,7 +76,11 @@ export function parseGrasp(input: string): Source {
     pubkey = decoded.data;
     identifier = parts[1];
   }
-  if (!identifier || identifier.length > 200 || /[\x00-\x1f\x7f]/.test(identifier))
+  if (
+    !identifier ||
+    identifier.length > 200 ||
+    [...identifier].some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)
+  )
     throw new Error('Invalid repository identifier.');
   relays = [...new Set(relays.map(relayUrl))].slice(0, 4);
   value = nip19.naddrEncode({ kind: 30617, pubkey, identifier, relays });
