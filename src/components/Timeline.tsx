@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Event } from '../types';
-import { EventRow } from './EventRow';
+import { EventRow, type TimelineEvent } from './EventRow';
 
 type Props = {
-  events: Event[];
+  events: TimelineTimelineEvent[];
   onSelectRepo?: (repo: string) => void;
   onSelectActor?: (actor: string) => void;
 };
@@ -13,8 +12,8 @@ const INITIAL_VISIBLE = 200;
 const PAGE = 200;
 const PREFETCH_MARGIN = '1200px 0px';
 
-function groupByDay(events: Event[]): Array<[string, Event[]]> {
-  const groups = new Map<string, Event[]>();
+function groupByDay(events: TimelineEvent[]): Array<[string, TimelineEvent[]]> {
+  const groups = new Map<string, TimelineEvent[]>();
   for (const e of events) {
     const day = e.timestamp.slice(0, 10);
     let arr = groups.get(day);

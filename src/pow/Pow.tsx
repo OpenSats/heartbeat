@@ -1,18 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Timeline } from '../components/Timeline';
+import type { TimelineEvent } from '../components/EventRow';
+import { HeartPulseIcon } from '../components/HeartPulseIcon';
+import { EVENT_TYPE_META } from '../eventTypes';
 import { sourcesFromUrl, type Source, type SourceResult } from './model';
 
 const initial = new URLSearchParams(window.location.search);
-const inputClass =
-  'w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-emerald-500 placeholder:text-zinc-700';
+const hasSources = (params: URLSearchParams) => ['p', 'gh', 'repo'].some((key) => params.has(key));
+const chipClass = (active = false) =>
+  `px-2 py-1 sm:py-0.5 text-xs rounded border transition ${active ? 'border-zinc-500 bg-zinc-800 text-zinc-100' : 'border-zinc-800 bg-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'}`;
+const inputClass = `${chipClass()} min-w-0 flex-1 max-w-md placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 focus:text-zinc-100`;
 const short = (s: string) => (s.startsWith('npub') ? `${s.slice(0, 12)}…${s.slice(-6)}` : s);
-const sourceColor = (s: Source) =>
-  s.kind === 'nostr'
+const sourceColor = (source: Source) =>
+  source.kind === 'nostr'
     ? 'text-violet-300'
-    : s.kind === 'repo'
+    : source.kind === 'repo'
       ? 'text-amber-300'
       : 'text-emerald-300';
 
-function SourceCard({
+function SourceStatus({
   source,
   onResult,
 }: {
@@ -41,7 +47,18 @@ function SourceCard({
         onResult(source.key, data);
         if (data.refreshing && polls++ < 20) timer = setTimeout(load, 3000);
       } catch (e) {
-        if (!controller.signal.aborted) setError((e as Error).message);
+        if (!controller.signal.aborted) {
+          const message = (e as Error).message;
+          setError(message);
+          onResult(source.key, {
+            source,
+            snapshot: null,
+            fetchedAt: null,
+            refreshing: false,
+            stale: true,
+            error: message,
+          });
+        }
       }
     };
     void load();
@@ -61,41 +78,133 @@ function SourceCard({
             ? 'stale'
             : 'cached';
   return (
-    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-4 min-w-0">
-      <div className="flex justify-between gap-3 text-[10px] uppercase tracking-widest text-zinc-500">
-        <span>{source.kind === 'repo' ? 'repository context' : source.kind}</span>
-        <span className={status === 'cached' ? 'text-emerald-500' : 'text-amber-400'}>
-          ● {status}
-        </span>
+    <details className="text-xs text-zinc-600">
+      <summary className="cursor-pointer hover:text-zinc-300 py-0.5">
+        <span className="text-zinc-500">{source.kind}:</span>{' '}
+        <span className={sourceColor(source)} title={source.label}>
+          {short(source.label)}
+        </span>{' '}
+        <span className={status === 'unavailable' ? 'text-amber-400' : ''}>{status}</span>
+        {result?.snapshot && <span> · {result.snapshot.events.length} events</span>}
+        {source.kind === 'repo' && <span> · all contributors</span>}
+      </summary>
+      <div className="pl-4 py-1 space-y-1 max-w-3xl">
+        {result?.snapshot && (
+          <>
+            <a href={result.snapshot.profileUrl} target="_blank" rel="noreferrer">
+              open source ↗
+            </a>
+            <p>{result.snapshot.coverage}</p>
+          </>
+        )}
+        {result?.fetchedAt && (
+          <p>
+            last fetched {new Date(result.fetchedAt).toISOString().replace('T', ' ').slice(0, 16)}{' '}
+            UTC
+          </p>
+        )}
+        {(error || result?.error) && <p className="text-amber-300">{error || result?.error}</p>}
       </div>
-      <div className={`my-3 truncate text-sm ${sourceColor(source)}`} title={source.label}>
-        {result?.snapshot ? (
-          <a href={result.snapshot.profileUrl} target="_blank" rel="noreferrer">
-            {short(source.label)} ↗
-          </a>
-        ) : (
-          short(source.label)
+    </details>
+  );
+}
+
+const heatColors = [
+  'bg-zinc-900',
+  'bg-emerald-950',
+  'bg-emerald-800',
+  'bg-emerald-600',
+  'bg-emerald-400',
+];
+function Heatmap({
+  dates,
+  selected,
+  onSelect,
+  loading,
+}: {
+  dates: string[];
+  selected: string;
+  onSelect: (day: string) => void;
+  loading: boolean;
+}) {
+  const counts = new Map<string, number>();
+  for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
+  const today = new Date().toISOString().slice(0, 10);
+  const end = Date.parse(`${today}T00:00:00Z`);
+  const start = end - 89 * 86400000;
+  const offset = new Date(start).getUTCDay();
+  const cells = Array.from({ length: Math.ceil((90 + offset) / 7) * 7 }, (_, i) => {
+    const time = start + (i - offset) * 86400000;
+    return time < start || time > end ? null : new Date(time).toISOString().slice(0, 10);
+  });
+  return (
+    <div className="px-3 py-3 border-b border-zinc-900 text-xs text-zinc-500">
+      <div className="mb-2 flex items-center gap-3">
+        <span>activity · last 90 days</span>
+        {loading && <span className="text-zinc-600">loading sources...</span>}
+        {selected && (
+          <button onClick={() => onSelect('')} className="text-zinc-300">
+            {selected} ×
+          </button>
         )}
       </div>
-      <div className="text-xs text-zinc-500">
-        {result?.snapshot
-          ? `${result.snapshot.events.length} activities`
-          : 'Looking for public activity…'}
-      </div>
-      {result?.fetchedAt && (
-        <div className="mt-2 text-[10px] text-zinc-600">
-          Fetched {new Date(result.fetchedAt).toLocaleString()}
+      <div className="flex items-start gap-2 overflow-x-auto pb-1">
+        <div className="grid grid-rows-7 gap-1 text-[10px] text-zinc-600 pt-5">
+          {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((d, i) => (
+            <span key={i} className="h-3.5 leading-3.5">
+              {d}
+            </span>
+          ))}
         </div>
-      )}
-      {(error || result?.error) && (
-        <p className="mt-3 text-xs text-amber-300">{error || result?.error}</p>
-      )}
-      {result?.snapshot && (
-        <details className="mt-3 text-[11px] text-zinc-500">
-          <summary className="cursor-pointer hover:text-zinc-300">Coverage</summary>
-          <p className="mt-2 leading-relaxed">{result.snapshot.coverage}</p>
-        </details>
-      )}
+        <div>
+          <div className="grid grid-flow-col auto-cols-[14px] gap-1 h-5 text-[10px] text-zinc-600">
+            {Array.from({ length: cells.length / 7 }, (_, week) => {
+              const date = cells
+                .slice(week * 7, week * 7 + 7)
+                .find((d) => d && (week === 0 || d.endsWith('-01')));
+              return (
+                <span key={week} className="overflow-visible">
+                  {date
+                    ? new Date(`${date}T00:00:00Z`).toLocaleString('en', {
+                        month: 'short',
+                        timeZone: 'UTC',
+                      })
+                    : ''}
+                </span>
+              );
+            })}
+          </div>
+          <div className="grid grid-rows-7 grid-flow-col auto-cols-[14px] gap-1">
+            {cells.map((day, i) => {
+              if (!day) return <span key={i} className="h-3.5" />;
+              const count = counts.get(day) ?? 0;
+              const level = count === 0 ? 0 : count < 3 ? 1 : count < 6 ? 2 : count < 12 ? 3 : 4;
+              const label = `${day}: ${count} fetched event${count === 1 ? '' : 's'}`;
+              return (
+                <button
+                  key={day}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={selected === day}
+                  disabled={loading}
+                  onClick={() => onSelect(selected === day ? '' : day)}
+                  className={`h-3.5 w-3.5 rounded-[2px] ${loading ? 'bg-zinc-800 animate-pulse' : heatColors[level]} ${selected === day ? 'outline outline-1 outline-zinc-100' : 'hover:outline hover:outline-1 hover:outline-zinc-500'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-white`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-zinc-600">
+            <span className="mr-1">less</span>
+            {heatColors.map((color) => (
+              <span key={color} className={`h-2.5 w-2.5 rounded-[2px] ${color}`} />
+            ))}
+            <span className="ml-1">more</span>
+          </div>
+        </div>
+      </div>
+      <p className="text-[10px] text-zinc-600 mt-2">
+        Empty cells mean no fetched events. Source limits and relay coverage can leave gaps.
+      </p>
     </div>
   );
 }
@@ -109,13 +218,26 @@ export function Pow() {
   const [filter, setFilter] = useState('all');
   const [kind, setKind] = useState('all');
   const [query, setQuery] = useState('');
+  const [actor, setActor] = useState('');
+  const [repo, setRepo] = useState('');
+  const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
   const { sources, errors } = useMemo(() => sourcesFromUrl(params), [params]);
-  // Stable callback prevents source requests from restarting when another source finishes.
   const onResult = useMemo(
     () => (key: string, result: SourceResult) => setResults((prev) => ({ ...prev, [key]: result })),
     [],
   );
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const update = () =>
+      document.documentElement.style.setProperty('--filter-bar-h', `${el.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     const pop = () => {
       const next = new URLSearchParams(location.search);
@@ -123,6 +245,9 @@ export function Pow() {
       setGh(next.getAll('gh').join(', '));
       setNpub(next.get('p') ?? '');
       setRepos(next.getAll('repo').join(', '));
+      setActor('');
+      setRepo('');
+      setDay('');
     };
     addEventListener('popstate', pop);
     return () => removeEventListener('popstate', pop);
@@ -134,28 +259,50 @@ export function Pow() {
     >();
     for (const source of sources) {
       if (filter !== 'all' && source.kind !== filter) continue;
-      for (const event of results[source.key]?.snapshot?.events ?? []) {
+      for (const event of results[source.key]?.snapshot?.events ?? [])
         if (!all.has(event.id)) all.set(event.id, { event, source });
-      }
     }
     return [...all.values()].sort((a, b) => b.event.timestamp.localeCompare(a.event.timestamp));
   }, [sources, results, filter]);
   const types = [...new Set(events.map(({ event }) => event.type))].sort();
-  const visible = events.filter(
+  const filtered = events.filter(
     ({ event }) =>
       (kind === 'all' || event.type === kind) &&
+      (!actor || event.actor === actor) &&
+      (!repo || event.repo === repo) &&
       `${event.title} ${event.repo ?? ''} ${event.actor}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const groups = new Map<string, typeof visible>();
-  for (const entry of visible) {
-    const date = entry.event.timestamp.slice(0, 10);
-    groups.set(date, [...(groups.get(date) ?? []), entry]);
-  }
-  const loaded = sources.filter((s) => results[s.key]).length;
-  const activeDays = new Set(events.map(({ event }) => event.timestamp.slice(0, 10))).size;
-  const repoCount = new Set(events.map(({ event }) => event.repo).filter(Boolean)).size;
+  const visible = filtered.filter(({ event }) => !day || event.timestamp.startsWith(day));
+  const timeline: TimelineEvent[] = visible.map(({ event, source }) => {
+    const type =
+      event.type === 'pull request'
+        ? 'pr_opened'
+        : event.type === 'issue'
+          ? 'issue_opened'
+          : event.type;
+    const meta =
+      type === 'post' || type === 'reply'
+        ? { label: type, sigil: type === 'post' ? '+' : '↳', colorClass: 'text-violet-400' }
+        : EVENT_TYPE_META[type as keyof typeof EVENT_TYPE_META];
+    return {
+      ...event,
+      type,
+      meta,
+      repo: event.repo ?? 'nostr',
+      shortId:
+        type === 'commit'
+          ? event.url.split('/').at(-1)!.slice(0, 7)
+          : type === 'post' || type === 'reply'
+            ? type
+            : `#${event.url.split('/').at(-1)}`,
+      context: source.kind === 'repo' ? 'Repository activity from all contributors' : undefined,
+    };
+  });
+  const loading = sources.some((s) => !results[s.key]);
+  const activeDays = new Set(filtered.map(({ event }) => event.timestamp.slice(0, 10))).size;
+  const repoCount = new Set(filtered.map(({ event }) => event.repo).filter(Boolean)).size;
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const next = new URLSearchParams();
@@ -174,32 +321,52 @@ export function Pow() {
     setParams(next);
     setFilter('all');
     setKind('all');
+    setActor('');
+    setRepo('');
+    setDay('');
   }
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-zinc-900 px-5 sm:px-10 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2 text-sm">
-          <span className="text-emerald-400">♥</span> heartbeat{' '}
-          <span className="text-zinc-600">/</span> <span className="text-zinc-400">pow</span>
-        </a>
-        <span className="text-[10px] tracking-widest uppercase text-zinc-600">
-          public activity explorer
-        </span>
-      </header>
-      <main className="mx-auto max-w-6xl px-5 sm:px-10 py-10">
-        <div className="mb-8">
-          <div className="text-[10px] tracking-[0.25em] uppercase text-emerald-500 mb-3">
-            Proof of work
+    <div className="min-h-full">
+      <div
+        ref={barRef}
+        className="sm:sticky sm:top-0 z-10 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur px-3 py-2 space-y-2"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <a
+              href="/"
+              className="flex items-center gap-1.5"
+              title="heartbeat"
+              aria-label="heartbeat"
+            >
+              <HeartPulseIcon className="h-7 w-7 shrink-0 text-zinc-100" />
+              <img
+                src="https://dergigi.com/assets/images/avatar.jpg"
+                alt=""
+                className="h-7 w-7 shrink-0 rounded-full object-cover"
+              />
+            </a>
+            <span className="text-xs text-zinc-500">/ pow</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl tracking-tight text-zinc-100">Follow the work.</h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-500">
-            One timeline across GitHub and Nostr. Bring the accounts; explore the public activity.
-          </p>
+          <button
+            className="text-xs text-zinc-500 hover:text-zinc-300"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(location.href)
+                .then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                })
+                .catch(() => setCopied(false));
+            }}
+          >
+            {copied ? 'copied' : 'copy link'}
+          </button>
         </div>
-        <form onSubmit={submit} className="rounded-xl border border-zinc-800 bg-zinc-900/20 p-5">
-          <div className="grid md:grid-cols-2 gap-4">
-            <label className="space-y-2">
-              <span className="text-xs text-zinc-400">Nostr npub</span>
+        {!hasSources(params) && (
+          <form onSubmit={submit} className="space-y-2">
+            <label className="flex items-center gap-1.5">
+              <span className="text-zinc-600 text-xs shrink-0 w-14">npub:</span>
               <input
                 className={inputClass}
                 placeholder="npub1…"
@@ -208,185 +375,129 @@ export function Pow() {
                 spellCheck={false}
               />
             </label>
-            <label className="space-y-2">
-              <span className="text-xs text-zinc-400">GitHub account</span>
+            <label className="flex items-center gap-1.5">
+              <span className="text-zinc-600 text-xs shrink-0 w-14">github:</span>
               <input
                 className={inputClass}
-                placeholder="dergigi"
+                placeholder="handle"
                 value={gh}
                 onChange={(e) => setGh(e.target.value)}
                 spellCheck={false}
               />
             </label>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 mt-4">
-            <label className="space-y-2 flex-1">
-              <span className="text-xs text-zinc-400">
-                Additional GitHub repositories{' '}
-                <span className="text-zinc-600">· optional, comma-separated</span>
-              </span>
-              <input
-                className={inputClass}
-                placeholder="owner/repo, https://github.com/owner/repo"
-                value={repos}
-                onChange={(e) => setRepos(e.target.value)}
-                spellCheck={false}
-              />
-            </label>
-            <button className="rounded-md bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-300 transition-colors">
-              Explore activity →
-            </button>
-          </div>
-          <p className="mt-4 text-[11px] leading-5 text-zinc-600">
-            Accounts are combined only in this URL. Each source is cached independently; no person
-            profile is saved.
-          </p>
-        </form>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <label className="flex items-center gap-1.5 flex-1 max-w-[calc(28rem+62px)] min-w-48">
+                <span className="text-zinc-600 text-xs shrink-0 w-14">repos:</span>
+                <input
+                  className={inputClass}
+                  placeholder="owner/repo, owner/another-repo"
+                  value={repos}
+                  onChange={(e) => setRepos(e.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+              <button className={chipClass(true)}>load</button>
+            </div>
+          </form>
+        )}
         {errors.map((error) => (
-          <p role="alert" key={error} className="mt-3 text-xs text-amber-300">
+          <p role="alert" key={error} className="text-xs text-amber-300">
             {error}
           </p>
         ))}
-        {!sources.length ? (
-          <div className="border border-dashed border-zinc-800 rounded-xl mt-8 px-6 py-16 text-center">
-            <span className="text-emerald-500 text-2xl">⌁</span>
-            <h2 className="mt-4 text-zinc-300">Start with an account.</h2>
-            <p className="text-sm text-zinc-600 mt-2">
-              Add a GitHub handle or npub above to see recent work.
-            </p>
-            <a href="/pow?gh=dergigi" className="inline-block mt-6 text-xs text-emerald-400">
-              Try dergigi on GitHub →
-            </a>
-          </div>
-        ) : (
+        {sources.length > 0 && (
           <>
-            <div className="flex justify-between items-center mt-9 mb-4">
-              <h2 className="text-xs uppercase tracking-widest text-zinc-500">
-                Sources <span className="text-zinc-700">/ {sources.length}</span>
-              </h2>
-              <button
-                className="text-xs text-zinc-400 hover:text-emerald-300"
-                onClick={() => {
-                  void navigator.clipboard
-                    .writeText(location.href)
-                    .then(() => {
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    })
-                    .catch(() => setCopied(false));
-                }}
-              >
-                {copied ? 'Copied ✓' : 'Copy view link ↗'}
-              </button>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {sources.map((source) => (
-                <SourceCard key={source.key} source={source} onResult={onResult} />
-              ))}
-            </div>
-            <div className="flex gap-8 sm:gap-14 py-8 my-2 border-b border-zinc-900">
-              {[
-                [events.length, 'activities'],
-                [activeDays, 'active days'],
-                [repoCount, 'repositories'],
-              ].map(([number, label]) => (
-                <div key={label}>
-                  <div className="text-2xl text-zinc-200">{number}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-600 mt-1">
-                    {label}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 py-4">
-              <h2 className="text-sm text-zinc-300 mr-auto">
-                Activity <span className="text-zinc-600">/{visible.length}</span>
-              </h2>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-zinc-600 text-xs shrink-0 w-14">source:</span>
               {['all', 'github', 'nostr', 'repo'].map((value) => (
                 <button
                   key={value}
+                  className={chipClass(filter === value)}
                   onClick={() => {
                     setFilter(value);
                     setKind('all');
                   }}
-                  className={`rounded px-2 py-1 text-xs border ${filter === value ? 'border-zinc-600 text-zinc-100 bg-zinc-800' : 'border-zinc-900 text-zinc-500'}`}
                 >
-                  {value === 'repo' ? 'repositories' : value}
+                  {value === 'repo' ? 'repos' : value}
                 </button>
               ))}
-              <select
-                aria-label="Activity type"
-                className="bg-zinc-950 text-xs border border-zinc-800 rounded p-1.5 text-zinc-400"
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-              >
-                <option value="all">All types</option>
-                {types.map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-zinc-600 text-xs shrink-0 w-14">types:</span>
+              {['all', ...types].map((value) => (
+                <button
+                  key={value}
+                  className={chipClass(kind === value)}
+                  onClick={() => setKind(value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-1.5">
+              <span className="text-zinc-600 text-xs shrink-0 w-14">filter:</span>
               <input
-                aria-label="Search activity"
-                className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-xs w-36 outline-none focus:border-zinc-500"
-                placeholder="Search activity"
+                className={`${inputClass} max-w-40`}
+                placeholder="search activity"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </div>
-            {!visible.length && (
-              <p className="py-12 text-sm text-zinc-500 text-center">
-                {loaded < sources.length
-                  ? 'Fetching source activity…'
-                  : 'No activity matches this view. Check source coverage above.'}
-              </p>
+            </label>
+            {(actor || repo) && (
+              <div className="flex flex-wrap gap-1.5">
+                {actor && (
+                  <button className={chipClass(true)} onClick={() => setActor('')}>
+                    dev: {short(actor)} ×
+                  </button>
+                )}
+                {repo && (
+                  <button className={chipClass(true)} onClick={() => setRepo('')}>
+                    repo: {repo} ×
+                  </button>
+                )}
+              </div>
             )}
-            {[...groups].map(([date, entries]) => (
-              <section key={date}>
-                <div className="sticky top-0 bg-zinc-950/95 backdrop-blur border-y border-zinc-900 py-2 text-xs text-zinc-500 z-10">
-                  {date} <span className="text-zinc-700 ml-2">{entries.length}</span>
-                </div>
-                {entries.map(({ event, source }) => (
-                  <article
-                    key={event.id}
-                    className="group grid grid-cols-[60px_1fr] sm:grid-cols-[60px_100px_1fr] gap-3 py-4 border-b border-zinc-900/60 hover:bg-zinc-900/30"
-                  >
-                    <time className="text-xs text-zinc-600 pt-0.5">
-                      {event.timestamp.slice(11, 16)}
-                    </time>
-                    <div className={`hidden sm:block text-[11px] pt-0.5 ${sourceColor(source)}`}>
-                      {event.type}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap gap-2 text-[10px] text-zinc-600 mb-1.5">
-                        <span className={sourceColor(source)}>
-                          {source.kind} · {short(event.actor)}
-                        </span>
-                        {event.repo && <span>{event.repo}</span>}
-                        {source.kind === 'repo' && (
-                          <span className="text-amber-500/70">all contributors</span>
-                        )}
-                        <span className="sm:hidden">{event.type}</span>
-                      </div>
-                      <a
-                        href={event.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block text-sm text-zinc-300 hover:text-zinc-100 whitespace-pre-wrap break-words leading-6 line-clamp-5"
-                      >
-                        {event.title || '(empty note)'}
-                      </a>
-                    </div>
-                  </article>
-                ))}
-              </section>
-            ))}
+            <div>
+              {sources.map((source) => (
+                <SourceStatus key={source.key} source={source} onResult={onResult} />
+              ))}
+            </div>
           </>
         )}
-        <footer className="mt-12 border-t border-zinc-900 pt-5 text-[10px] leading-5 text-zinc-600 flex flex-wrap justify-between gap-3">
-          <span>heartbeat / pow · public evidence, original sources</span>
-          <span>90-day snapshots · cached for 24 hours · timestamps in UTC</span>
-        </footer>
-      </main>
+      </div>
+      {!!sources.length && (
+        <Heatmap
+          dates={filtered.map(({ event }) => event.timestamp.slice(0, 10))}
+          selected={day}
+          onSelect={setDay}
+          loading={loading}
+        />
+      )}
+      {!sources.length ? (
+        <div className="text-zinc-500 px-2 py-8 text-sm">
+          Enter a GitHub handle or npub to load activity.{' '}
+          <a href="/pow?gh=dergigi" className="text-zinc-400">
+            Try dergigi
+          </a>
+          .
+        </div>
+      ) : loading && !visible.length ? (
+        <div className="text-zinc-500 px-2 py-8">loading...</div>
+      ) : (
+        <Timeline
+          events={timeline}
+          onSelectActor={setActor}
+          onSelectRepo={(value) => {
+            if (value !== 'nostr') setRepo(value);
+          }}
+        />
+      )}
+      <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900 space-y-1">
+        <div>
+          {visible.length} events · {activeDays} active days · {repoCount} repo(s)
+        </div>
+        <div>window 90d · cache 24h · timestamps UTC · {sources.length} source(s)</div>
+      </footer>
     </div>
   );
 }
