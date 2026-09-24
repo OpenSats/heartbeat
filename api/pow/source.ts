@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { waitUntil } from '@vercel/functions';
-import { historyMonths, parseSource } from '../../src/pow/model.js';
+import { FIRST_HISTORY_YEAR, historyMonths, parseSource } from '../../src/pow/model.js';
 import { claimRefresh, readCache, refresh } from '../../server/cache.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -21,7 +21,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Supply exactly one source: kind and value.');
     source = parseSource(req.query.kind, req.query.value);
     month = typeof req.query.month === 'string' ? req.query.month : historyMonths()[0];
-    if (!historyMonths().includes(month)) throw new Error('Month must be within the last year.');
+    if (
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ||
+      month < `${FIRST_HISTORY_YEAR}-01` ||
+      month > new Date().toISOString().slice(0, 7)
+    )
+      throw new Error('Month must be between January 2008 and the current month.');
   } catch (error) {
     return res.status(400).json({ error: (error as Error).message });
   }
