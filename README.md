@@ -12,17 +12,20 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
-The browser backfills 365 days in monthly requests and draws a daily heatmap.
+The browser defaults to 365 days and backfills monthly requests. A year selector
+loads calendar years back to 2008, stored as `year=2025` in the view URL. Each
+platform has a separate heatmap, yearly total, and coverage indicators.
 The current month stays fresh for 24 hours; finished historical months are cached
-for 90 days. Incomplete months retry after one hour. Failed requests preserve
+indefinitely. Incomplete months retry after one hour. Failed requests preserve
 cached results and back off for two minutes. A database lease prevents duplicate
 fetches. Each cache key identifies one source and month; associations remain in
-the URL. Historical snapshots are occasionally revalidated for edits, deletions,
-and changes to search indexing.
+the URL. Completed historical snapshots have no automatic expiry. A month fetched while
+it was current is fetched through month-end once it closes. Edits, deletions, and
+indexing changes after that require explicit cache invalidation.
 
 GitHub collection paginates commit and issue/PR search results. Intervals with
-more than 1,000 results are subdivided. A per-request budget bounds collection;
-months that hit it are marked incomplete. Reviews and merge actions are excluded.
+more than 1,000 results are subdivided. Search pagination progress is saved between requests. Busy months resume on
+subsequent requests and remain marked incomplete until pagination finishes. Reviews and merge actions are excluded.
 Extra GitHub repos include all contributors. Other git hosts are not supported.
 Nostr paginates signed kind-1 notes across three fixed relays. Its relay coverage
 can never prove inactivity. All Nostr days, unfetched periods, and incomplete
