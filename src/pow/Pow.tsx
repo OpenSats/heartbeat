@@ -717,8 +717,8 @@ export function Pow() {
           {visible.length} events · {activeDays} active days · {repoCount} repo(s)
         </div>
         <div>
-          {year === null ? 'window 365d' : `year ${year}`} · recent cache 24h · history cache 90d ·
-          timestamps UTC · {sources.length} source(s)
+          {year === null ? 'window 365d' : `year ${year}`} · recent cache 24h · history cached
+          indefinitely · timestamps UTC · {sources.length} source(s)
         </div>
       </footer>
     </div>
