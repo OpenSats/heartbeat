@@ -9,3 +9,5 @@ dist
 
 public/data/
 
+.vercel
+.env*

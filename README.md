@@ -1,5 +1,35 @@
 # heartbeat
 
+## PoW activity explorer (MVP)
+
+Open `/pow?gh=dergigi` or supply `p=npub…` and repeated `repo=owner/repo`
+parameters. The browser combines sources; the backend accepts exactly one source
+per request. No person registry, identity mappings, or combined reports are stored.
+
+`/api/pow/source?kind=github&value=dergigi` uses a Neon Postgres source cache.
+Set server-only `DATABASE_URL` and `GITHUB_TOKEN`; run `npm run db:migrate` once
+against that database. For local setup using pulled Vercel variables:
+`node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
+Use `vercel dev` for the frontend and API together.
+
+Snapshots stay fresh for 24 hours. Stale data is served during refresh, failed
+refreshes preserve the last snapshot and back off for 15 minutes, and a database
+lease prevents duplicate fetches. A global limit allows 120 refresh attempts per
+hour. Production and previews share this cache, so schema changes must remain
+backwards compatible. Cache budget rows older than two days are removed by the
+migration command. Successful refreshes replace bounded 90-day snapshots; this
+MVP is not a permanent archive or an incremental collector.
+
+GitHub coverage: up to 100 authored commits and 100 authored issues/PRs from
+public search. Extra GitHub repos show all contributors, separately labeled as
+repository context. Other git hosts, reviews, and merge actions are not supported
+yet. Nostr fetches up to 200 signed kind-1 notes from each of three fixed relays;
+coverage is shown per source. Each source can succeed or fail independently.
+
+The page sends no combined identifiers to the API and suppresses Referer headers.
+Full page URLs can still appear in browser history and hosting access logs; do not
+add analytics that store query strings. Database credentials stay server-side.
+
 Static activity dashboard for a set of GitHub, GitLab, Forgejo, and plain
 git repos. Renders commits, PRs, issues, and releases as a
 `git log --oneline`-style timeline.
