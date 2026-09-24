@@ -88,44 +88,37 @@ function SourceStatus({
       setResult(combined);
       onResult(source.key, combined);
     };
+    const fetchMonth = async (month: string) => {
+      const query = new URLSearchParams({
+        kind: source.kind,
+        value: source.kind === 'nostr' ? source.label : source.value,
+        month,
+      });
+      const response = await fetch(`/api/pow/source?${query}`, {
+        signal: controller.signal,
+        referrerPolicy: 'no-referrer',
+      });
+      const data = (await response.json()) as SourceResult;
+      if (!response.ok) throw new Error(data.error ?? 'Unable to load source.');
+      chunks.set(month, data);
+      publish(chunks.size < months.length || [...chunks.values()].some((r) => r.refreshing));
+    };
     const load = async () => {
-      for (const month of months) {
+      // Enqueue every month up front. Backfills then continue without this browser.
+      const results = await Promise.allSettled(months.map(fetchMonth));
+      if (controller.signal.aborted) return;
+      const failed = results.find((r) => r.status === 'rejected');
+      if (failed?.status === 'rejected') setError(String(failed.reason?.message ?? failed.reason));
+      while (!controller.signal.aborted) {
+        const pending = months.filter((month) => chunks.get(month)?.refreshing);
+        if (!pending.length) break;
+        await pause(10000);
         if (controller.signal.aborted) return;
-        let attempts = 0;
-        let finished = false;
-        while (!finished && !controller.signal.aborted) {
-          try {
-            const started = Date.now();
-            const query = new URLSearchParams({
-              kind: source.kind,
-              value: source.kind === 'nostr' ? source.label : source.value,
-              month,
-            });
-            const response = await fetch(`/api/pow/source?${query}`, {
-              signal: controller.signal,
-              referrerPolicy: 'no-referrer',
-            });
-            const data = (await response.json()) as SourceResult;
-            if (!response.ok) throw new Error(data.error ?? 'Unable to load source.');
-            chunks.set(month, data);
-            publish(true);
-            if ((data.refreshing || data.snapshot?.pending?.length) && attempts++ < 200) {
-              await pause(data.snapshot?.pending?.length ? 12000 : 3000);
-              continue;
-            }
-            if (data.error && data.retryAt && attempts++ < 2 && data.error.includes('rate limit')) {
-              await pause(Math.max(3000, Date.parse(data.retryAt) - Date.now() + 1000));
-              continue;
-            }
-            finished = true;
-            if (source.kind !== 'nostr' && data.fetchedAt && Date.parse(data.fetchedAt) >= started)
-              await pause(5000);
-          } catch (e) {
-            if (controller.signal.aborted) return;
-            setError((e as Error).message);
-            publish(false, (e as Error).message);
-            return;
-          }
+        const polled = await Promise.allSettled(pending.map(fetchMonth));
+        if (polled.some((r) => r.status === 'rejected')) {
+          if (!controller.signal.aborted)
+            setError('Unable to check progress. Background jobs will continue.');
+          return;
         }
       }
       publish(false);
@@ -134,7 +127,7 @@ function SourceStatus({
     return () => controller.abort();
   }, [source, onResult, year]);
   const status =
-    error || result?.error
+    error || (result?.error && !result.refreshing)
       ? 'unavailable'
       : !result
         ? 'fetching'
