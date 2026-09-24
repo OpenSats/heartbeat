@@ -12,12 +12,14 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
-The browser defaults to 365 days and backfills monthly requests. A year selector
+The browser defaults to 365 days and queues all requested months up front. A year selector
 loads calendar years back to 2008, stored as `year=2025` in the view URL. Each
 platform has a separate heatmap, yearly total, and coverage indicators.
 The current month stays fresh for 24 hours; finished historical months are cached
 indefinitely. Incomplete months retry after one hour. Failed requests preserve
-cached results and back off for two minutes. A database lease prevents duplicate
+cached results and back off for two minutes, or until GitHub permits retrying.
+After five consecutive collection errors, a job stops and can be requested again
+after an hour. A database lease prevents duplicate
 fetches. Each cache key identifies one source and month; associations remain in
 the URL. Completed historical snapshots have no automatic expiry. A month fetched while
 it was current is fetched through month-end once it closes. Edits, deletions, and
@@ -25,7 +27,7 @@ indexing changes after that require explicit cache invalidation.
 
 GitHub collection paginates commit and issue/PR search results. Intervals with
 more than 1,000 results are subdivided. Search pagination progress is saved between requests. Busy months resume on
-subsequent requests and remain marked incomplete until pagination finishes. Reviews and merge actions are excluded.
+subsequent worker deliveries and remain marked incomplete until pagination finishes. Reviews and merge actions are excluded.
 Extra GitHub repos include all contributors. Other git hosts are not supported.
 Nostr paginates signed kind-1 notes across three fixed relays. Its relay coverage
 can never prove inactivity. All Nostr days, unfetched periods, and incomplete
@@ -34,11 +36,17 @@ activity in the fetched GitHub categories. Today remains uncertain until complet
 Click a day to filter the timeline. The source form is hidden when URL parameters
 are present. Nostr links use njump.to.
 
-A global limit allows 120 refresh attempts per hour. Production and previews
-share the cache, so schema changes must remain backwards compatible. Budget rows
-older than two days are removed by the migration command. Very large month
-responses are bounded at 3 MB and explicitly marked incomplete. Backfill resumes
-from cached months when the page is reopened.
+Vercel Queues runs separate GitHub and Nostr consumers, configured in `vercel.json`.
+No extra queue credentials are needed on Vercel. GitHub has one worker per deployment;
+Nostr has two. A shared database throttle spaces GitHub search requests and honors
+rate-limit reset and Retry-After headers across deployments. Jobs contain one source
+and one month. Leases deduplicate jobs across visitors, preview, and production.
+The page polls cached results every ten seconds; queued jobs continue after it closes.
+Queue messages expire after seven days; revisiting a source recovers expired jobs.
+Production and previews share the cache, so schema changes must remain backwards
+compatible. The old budget table is retained for older previews but these workers
+no longer use it. Very large month responses are bounded at 3 MB and explicitly
+marked incomplete.
 
 The page sends no combined identifiers to the API and suppresses Referer headers.
 Full page URLs can still appear in browser history and hosting access logs; do not

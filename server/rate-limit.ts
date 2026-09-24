@@ -10,7 +10,7 @@ export class RetryLater extends Error {
 }
 
 // Shared by preview and production, just like the source cache.
-export async function githubSlot(resource: string) {
+export async function githubSlot(resource: string, waited = false): Promise<void> {
   const sql = neon(process.env.DATABASE_URL!);
   const spacing = resource === 'search' ? 2200 : 200;
   const rows = await sql`
@@ -19,7 +19,12 @@ export async function githubSlot(resource: string) {
     WHERE pow_provider_limits.next_at <= now() RETURNING resource`;
   if (!rows.length) {
     const [row] = await sql`SELECT next_at FROM pow_provider_limits WHERE resource = ${resource}`;
-    throw new RetryLater(Math.max(3, Math.ceil((Date.parse(row.next_at) - Date.now()) / 1000)));
+    const seconds = Math.max(1, Math.ceil((Date.parse(row.next_at) - Date.now()) / 1000));
+    if (!waited && seconds <= 3) {
+      await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+      return githubSlot(resource, true);
+    }
+    throw new RetryLater(Math.max(3, seconds));
   }
 }
 
