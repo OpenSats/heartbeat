@@ -247,10 +247,10 @@ export async function collect(source: Source, month: string): Promise<Snapshot> 
       timestamp: new Date(e.created_at * 1000).toISOString(),
       type: e.tags.some((t) => t[0] === 'e') ? 'reply' : 'post',
       title: e.content.slice(0, 4000),
-      url: `https://njump.me/${nip19.noteEncode(e.id)}`,
+      url: `https://njump.to/${nip19.noteEncode(e.id)}`,
       actor: source.label,
     })),
-    profileUrl: `https://njump.me/${source.label}`,
+    profileUrl: `https://njump.to/${source.label}`,
     coverage: `${month}: paginated text notes from ${successful.length}/${RELAYS.length} relays. Relays can omit history; empty days cannot confirm inactivity. Notes with event references are labeled replies.`,
     windows: [
       {
