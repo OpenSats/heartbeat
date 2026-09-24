@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { waitUntil } from '@vercel/functions';
 import { FIRST_HISTORY_YEAR, historyMonths, parseSource } from '../../src/pow/model.js';
-import { claimRefresh, readCache, refresh } from '../../server/cache.js';
+import { readCache } from '../../server/cache.js';
+import { enqueue } from '../../server/queue.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -33,22 +33,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const cached = await readCache(source, month);
     if (cached.stale && cached.retry && !cached.refreshing) {
-      const token = await claimRefresh(source, month);
-      if (token) {
-        if (cached.snapshot) {
-          waitUntil(refresh(source, token, month));
-          cached.refreshing = true;
-        } else {
-          await refresh(source, token, month);
-          return res.status(200).json(await readCache(source, month));
-        }
-      } else if (!cached.snapshot) {
-        const latest = await readCache(source, month);
-        return res.status(200).json({
-          ...latest,
-          error: latest.refreshing ? null : 'Refresh capacity reached. Please try again later.',
-        });
-      }
+      await enqueue(source, month);
+      return res.status(200).json(await readCache(source, month));
     }
     return res.status(200).json(cached);
   } catch {

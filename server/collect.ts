@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { githubSlot, githubCooldown, RetryLater } from './rate-limit.js';
 import { nip19, verifyEvent, type Event as NostrEvent } from 'nostr-tools';
 import type { Activity, SearchTask, Snapshot, Source } from '../src/pow/model.js';
 
@@ -12,6 +13,8 @@ export function monthBounds(month: string) {
   };
 }
 async function github<T>(path: string): Promise<T> {
+  const resource = path.startsWith('/search/') ? 'search' : 'core';
+  await githubSlot(resource);
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       Accept: 'application/vnd.github+json',
@@ -20,6 +23,10 @@ async function github<T>(path: string): Promise<T> {
     signal: AbortSignal.timeout(12000),
     redirect: 'error',
   });
+  if (response.status === 403 || response.status === 429)
+    throw await githubCooldown(resource, response);
+  if (response.headers.get('x-ratelimit-remaining') === '0')
+    await githubCooldown(resource, response);
   if (!response.ok)
     throw new Error(
       response.status === 404
@@ -74,9 +81,16 @@ async function collectGithub(
     const task = pending[0];
     const field = task.endpoint === 'commits' ? 'author-date' : 'created';
     const query = `${source.kind === 'repo' ? 'repo' : 'author'}:${source.value} is:public ${field}:${task.from}..${task.to}`;
-    const page = await github<Search<Commit | Issue>>(
-      `/search/${task.endpoint}?q=${encodeURIComponent(query)}&sort=${field}&order=desc&per_page=100&page=${task.page}`,
-    );
+    let page: Search<Commit | Issue>;
+    try {
+      page = await github<Search<Commit | Issue>>(
+        `/search/${task.endpoint}?q=${encodeURIComponent(query)}&sort=${field}&order=desc&per_page=100&page=${task.page}`,
+      );
+    } catch (error) {
+      // Save pages already fetched before waiting for the next provider slot.
+      if (error instanceof RetryLater && requests > 0) break;
+      throw error;
+    }
     pending.shift();
     if (
       task.page === 1 &&
