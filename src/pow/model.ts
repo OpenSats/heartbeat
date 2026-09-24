@@ -21,7 +21,17 @@ export type CoverageWindow = {
   exhaustive: boolean;
   basis: 'github-search' | 'relay';
 };
+export type SearchTask = {
+  endpoint: 'commits' | 'issues';
+  from: string;
+  to: string;
+  page: number;
+  total?: number;
+  seen?: number;
+};
 export type Snapshot = {
+  pending?: SearchTask[];
+  searchIncomplete?: boolean;
   events: Activity[];
   coverage: string;
   profileUrl: string;

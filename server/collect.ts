@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { nip19, verifyEvent, type Event as NostrEvent } from 'nostr-tools';
-import type { Activity, Snapshot, Source } from '../src/pow/model.js';
+import type { Activity, SearchTask, Snapshot, Source } from '../src/pow/model.js';
 
 export function monthBounds(month: string) {
   const from = new Date(`${month}-01T00:00:00Z`);
@@ -46,108 +46,91 @@ type Issue = {
 };
 type Search<T> = { items: T[]; total_count: number; incomplete_results: boolean };
 
-// Split crowded intervals to get past GitHub's 1,000-result search limit.
-// A bounded request budget leaves exceptionally busy months explicitly incomplete.
-async function searchAll<T>(
-  endpoint: string,
-  query: string,
-  dateField: string,
-  from: string,
-  to: string,
-  budget: { remaining: number; deadline: number },
-): Promise<{ items: T[]; exhaustive: boolean }> {
-  if (budget.remaining <= 0 || Date.now() > budget.deadline)
-    return { items: [], exhaustive: false };
-  const q = `${query} ${dateField}:${from}..${to}`;
-  const page = async (number: number) => {
-    budget.remaining--;
-    return github<Search<T>>(
-      `/search/${endpoint}?q=${encodeURIComponent(q)}&sort=${endpoint === 'commits' ? 'author-date' : 'created'}&order=desc&per_page=100&page=${number}`,
-    );
-  };
-  const first = await page(1);
-  if (first.total_count > 1000 && Date.parse(to) - Date.parse(from) > 1000) {
-    const middle = Math.floor((Date.parse(from) + Date.parse(to)) / 2000) * 1000;
-    const left = await searchAll<T>(
-      endpoint,
-      query,
-      dateField,
-      from,
-      new Date(middle).toISOString(),
-      budget,
-    );
-    const right = await searchAll<T>(
-      endpoint,
-      query,
-      dateField,
-      new Date(middle + 1000).toISOString(),
-      to,
-      budget,
-    );
-    return {
-      items: [...left.items, ...right.items],
-      exhaustive: left.exhaustive && right.exhaustive,
-    };
+async function collectGithub(
+  source: Source,
+  month: string,
+  previous?: Snapshot | null,
+): Promise<Snapshot> {
+  const bounds = previous?.pending?.length ? previous.windows![0] : monthBounds(month);
+  const resuming = !!previous?.pending?.length;
+  if (!resuming) {
+    if (source.kind === 'repo') {
+      const repo = await github<{ private: boolean }>(`/repos/${source.value}`);
+      if (repo.private) throw new Error('Only public repositories are supported.');
+    } else await github(`/users/${source.value}`);
   }
-  const items = [...first.items];
-  let exhaustive = !first.incomplete_results && first.total_count <= 1000;
-  const pages = Math.min(10, Math.ceil(first.total_count / 100));
-  for (let number = 2; number <= pages; number++) {
-    if (budget.remaining <= 0 || Date.now() > budget.deadline) {
-      exhaustive = false;
-      break;
-    }
-    const result = await page(number);
-    items.push(...result.items);
-    exhaustive &&= !result.incomplete_results;
-  }
-  return { items, exhaustive: exhaustive && items.length >= first.total_count };
-}
-async function collectGithub(source: Source, month: string): Promise<Snapshot> {
-  const bounds = monthBounds(month);
-  if (source.kind === 'repo') {
-    const repo = await github<{ private: boolean }>(`/repos/${source.value}`);
-    if (repo.private) throw new Error('Only public repositories are supported.');
-  } else await github(`/users/${source.value}`);
-  const query = `${source.kind === 'repo' ? 'repo' : 'author'}:${source.value} is:public`;
-  const budget = { remaining: 24, deadline: Date.now() + 35000 };
-  const commits = await searchAll<Commit>(
-    'commits',
-    query,
-    'author-date',
-    bounds.from,
-    bounds.to,
-    budget,
+  const pending: SearchTask[] = resuming
+    ? [...previous!.pending!]
+    : [
+        { endpoint: 'commits', from: bounds.from, to: bounds.to, page: 1 },
+        { endpoint: 'issues', from: bounds.from, to: bounds.to, page: 1 },
+      ];
+  const events = new Map<string, Activity>(
+    (resuming ? previous!.events : []).map((event) => [event.id, event]),
   );
-  const issues = await searchAll<Issue>('issues', query, 'created', bounds.from, bounds.to, budget);
-  const exhaustive = commits.exhaustive && issues.exhaustive;
-  const events: Activity[] = [
-    ...commits.items
-      .filter((c) => c.repository.private === false)
-      .map((c) => ({
-        id: c.html_url,
-        timestamp: c.commit.author.date,
-        type: 'commit',
-        title: c.commit.message.split('\n')[0],
-        url: c.html_url,
-        actor: c.author?.login ?? c.commit.author.name,
-        repo: c.repository.full_name,
-      })),
-    ...issues.items.map((i) => ({
-      id: i.html_url,
-      timestamp: i.created_at,
-      type: i.pull_request ? 'pull request' : 'issue',
-      title: i.title,
-      url: i.html_url,
-      actor: i.user.login,
-      repo: i.repository_url.split('/repos/')[1],
-    })),
-  ];
+  let incomplete = resuming ? (previous!.searchIncomplete ?? false) : false;
+  const deadline = Date.now() + 25000;
+  for (let requests = 0; pending.length && requests < 5 && Date.now() < deadline; requests++) {
+    const task = pending[0];
+    const field = task.endpoint === 'commits' ? 'author-date' : 'created';
+    const query = `${source.kind === 'repo' ? 'repo' : 'author'}:${source.value} is:public ${field}:${task.from}..${task.to}`;
+    const page = await github<Search<Commit | Issue>>(
+      `/search/${task.endpoint}?q=${encodeURIComponent(query)}&sort=${field}&order=desc&per_page=100&page=${task.page}`,
+    );
+    pending.shift();
+    if (
+      task.page === 1 &&
+      page.total_count > 1000 &&
+      Date.parse(task.to) - Date.parse(task.from) > 1000
+    ) {
+      const midpoint = Math.floor((Date.parse(task.from) + Date.parse(task.to)) / 2000) * 1000;
+      pending.unshift(
+        { ...task, to: new Date(midpoint).toISOString() },
+        { ...task, from: new Date(midpoint + 1000).toISOString() },
+      );
+      continue;
+    }
+    incomplete ||= page.incomplete_results || page.total_count > 1000;
+    for (const item of page.items) {
+      if (task.endpoint === 'commits') {
+        const c = item as Commit;
+        if (c.repository.private) continue;
+        events.set(c.html_url, {
+          id: c.html_url,
+          timestamp: c.commit.author.date,
+          type: 'commit',
+          title: c.commit.message.split('\n')[0],
+          url: c.html_url,
+          actor: c.author?.login ?? c.commit.author.name,
+          repo: c.repository.full_name,
+        });
+      } else {
+        const i = item as Issue;
+        events.set(i.html_url, {
+          id: i.html_url,
+          timestamp: i.created_at,
+          type: i.pull_request ? 'pull request' : 'issue',
+          title: i.title,
+          url: i.html_url,
+          actor: i.user.login,
+          repo: i.repository_url.split('/repos/')[1],
+        });
+      }
+    }
+    const total = task.total ?? page.total_count;
+    const seen = (task.seen ?? 0) + page.items.length;
+    if (seen < Math.min(total, 1000) && task.page < 10 && page.items.length)
+      pending.unshift({ ...task, page: task.page + 1, total, seen });
+    else if (seen < total) incomplete = true;
+  }
+  const exhaustive = !pending.length && !incomplete;
   return {
-    events: [...new Map(events.map((e) => [e.id, e])).values()],
+    events: [...events.values()],
+    pending,
+    searchIncomplete: incomplete,
     profileUrl: `https://github.com/${source.value}`,
-    coverage: `${month}: ${exhaustive ? 'All returned search pages fetched' : 'Search incomplete; gaps are unknown'}. Public authored commits, issues and PRs only; reviews and merge actions are excluded. GitHub search indexing can omit activity.${source.kind === 'repo' ? ' Repository context includes all contributors.' : ''}`,
-    windows: [{ ...bounds, exhaustive, basis: 'github-search' }],
+    coverage: `${month}: ${pending.length ? 'Backfill in progress' : exhaustive ? 'All returned search pages fetched' : 'GitHub returned incomplete results'}. Public authored commits, issues and PRs only; reviews and merge actions are excluded. GitHub indexing can omit activity.${source.kind === 'repo' ? ' Repository context includes all contributors.' : ''}`,
+    windows: [{ from: bounds.from, to: bounds.to, exhaustive, basis: 'github-search' }],
   };
 }
 const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
@@ -236,8 +219,12 @@ function relayEvents(
     ws.on('close', () => finish(false, 'Relay closed before completing request'));
   });
 }
-export async function collect(source: Source, month: string): Promise<Snapshot> {
-  if (source.kind !== 'nostr') return collectGithub(source, month);
+export async function collect(
+  source: Source,
+  month: string,
+  previous?: Snapshot | null,
+): Promise<Snapshot> {
+  if (source.kind !== 'nostr') return collectGithub(source, month, previous);
   const results = await Promise.allSettled(
     RELAYS.map((url) => relayEvents(url, source.value, month)),
   );
