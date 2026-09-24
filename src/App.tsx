@@ -134,6 +134,11 @@ export function App() {
       <Timeline events={filtered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
       <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900 space-y-1">
         <div>
+          <a href="/pow" className="text-emerald-400">
+            Explore a person's activity →
+          </a>
+        </div>
+        <div>
           {fmt(data.events.length)} events: {statParts.join(', ')}
         </div>
         <div>

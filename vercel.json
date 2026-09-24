@@ -1,0 +1,16 @@
+{
+  "functions": { "api/pow/source.ts": { "maxDuration": 60 } },
+  "rewrites": [
+    { "source": "/pow", "destination": "/index.html" },
+    { "source": "/pow/", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/pow/:path*",
+      "headers": [
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    }
+  ]
+}
