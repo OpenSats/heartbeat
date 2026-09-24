@@ -1,10 +1,16 @@
 import { memo } from 'react';
-import type { Event } from '../types';
-import { EVENT_TYPE_META } from '../eventTypes';
+import type { Event, EventType } from '../types';
+import { EVENT_TYPE_META, type EventTypeMeta } from '../eventTypes';
 import { RepoLabel } from './RepoLabel';
 
+export type TimelineEvent = Omit<Event, 'type'> & {
+  type: string;
+  meta?: EventTypeMeta;
+  context?: string;
+};
+
 type Props = {
-  event: Event;
+  event: TimelineEvent;
   onSelectRepo?: (repo: string) => void;
   onSelectActor?: (actor: string) => void;
 };
@@ -37,7 +43,7 @@ function FilterButton({
 export const EventRow = memo(EventRowImpl);
 
 function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
-  const meta = EVENT_TYPE_META[event.type];
+  const meta = event.meta ?? EVENT_TYPE_META[event.type as EventType];
   const time = event.timestamp.slice(11, 16);
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 py-1 sm:py-0.5 px-2 text-sm leading-6 hover:bg-zinc-900/60">
@@ -68,6 +74,11 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       >
         {event.actor}
       </FilterButton>
+      {event.context && (
+        <span className="text-xs text-amber-500/70" title={event.context}>
+          repo context
+        </span>
+      )}
       <a
         href={event.url}
         target="_blank"
