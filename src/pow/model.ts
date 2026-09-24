@@ -15,7 +15,30 @@ export type Activity = {
   actor: string;
   repo?: string;
 };
-export type Snapshot = { events: Activity[]; coverage: string; profileUrl: string };
+export type CoverageWindow = {
+  from: string;
+  to: string;
+  exhaustive: boolean;
+  basis: 'github-search' | 'relay';
+};
+export type Snapshot = {
+  events: Activity[];
+  coverage: string;
+  profileUrl: string;
+  windows?: CoverageWindow[];
+};
+export function historyMonths(now = new Date()): string[] {
+  const oldest = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - 364 * 86400000,
+  );
+  const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const result: string[] = [];
+  while (month.getTime() >= Date.UTC(oldest.getUTCFullYear(), oldest.getUTCMonth(), 1)) {
+    result.push(month.toISOString().slice(0, 7));
+    month.setUTCMonth(month.getUTCMonth() - 1);
+  }
+  return result;
+}
 export type SourceResult = {
   source: Source;
   snapshot: Snapshot | null;
@@ -23,6 +46,9 @@ export type SourceResult = {
   refreshing: boolean;
   stale: boolean;
   error: string | null;
+  retryAt?: string | null;
+  monthsLoaded?: number;
+  monthsTotal?: number;
 };
 
 export function parseSource(kind: string, input: string): Source {
