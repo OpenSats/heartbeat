@@ -2,35 +2,41 @@ import WebSocket from 'ws';
 import { nip19, verifyEvent, type Event as NostrEvent } from 'nostr-tools';
 import type { Activity, Snapshot, Source } from '../src/pow/model.js';
 
-const DAYS = 90;
-const since = () => new Date(Date.now() - DAYS * 86400000).toISOString();
+export function monthBounds(month: string) {
+  const from = new Date(`${month}-01T00:00:00Z`);
+  const next = new Date(from);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  return {
+    from: from.toISOString(),
+    to: new Date(Math.min(next.getTime() - 1, Date.now())).toISOString(),
+  };
+}
 async function github<T>(path: string): Promise<T> {
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       Accept: 'application/vnd.github+json',
       ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
     },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(12000),
     redirect: 'error',
   });
   if (!response.ok)
     throw new Error(
       response.status === 404
         ? 'GitHub account or public repository not found.'
-        : `GitHub is unavailable (${response.status}); try again later.`,
+        : response.status === 403 || response.status === 429
+          ? 'GitHub rate limit reached. Backfill will retry shortly.'
+          : `GitHub is unavailable (${response.status}).`,
     );
   return response.json() as Promise<T>;
 }
 type Commit = {
-  sha: string;
   html_url: string;
   author: { login: string } | null;
   commit: { message: string; author: { name: string; date: string } };
-  repository?: { full_name: string; private: boolean };
+  repository: { full_name: string; private: boolean };
 };
 type Issue = {
-  id: number;
-  number: number;
   title: string;
   html_url: string;
   created_at: string;
@@ -39,137 +45,202 @@ type Issue = {
   pull_request?: unknown;
 };
 type Search<T> = { items: T[]; total_count: number; incomplete_results: boolean };
-const commitActivity = (c: Commit, repo?: string): Activity => ({
-  id: c.html_url,
-  timestamp: c.commit.author.date,
-  type: 'commit',
-  title: c.commit.message.split('\n')[0],
-  url: c.html_url,
-  actor: c.author?.login ?? c.commit.author.name,
-  repo: repo ?? c.repository?.full_name,
-});
-const issueActivity = (i: Issue, repo?: string): Activity => ({
-  id: i.html_url,
-  timestamp: i.created_at,
-  type: i.pull_request ? 'pull request' : 'issue',
-  title: i.title,
-  url: i.html_url,
-  actor: i.user.login,
-  repo: repo ?? i.repository_url.split('/repos/')[1],
-});
 
-async function collectGithub(source: Source): Promise<Snapshot> {
-  const cutoff = since();
-  if (source.kind === 'github') {
-    await github(`/users/${source.value}`);
-    const [commits, issues] = await Promise.all([
-      github<Search<Commit>>(
-        `/search/commits?q=${encodeURIComponent(`author:${source.value} author-date:>=${cutoff.slice(0, 10)} is:public`)}&sort=author-date&order=desc&per_page=100`,
-      ),
-      github<Search<Issue>>(
-        `/search/issues?q=${encodeURIComponent(`author:${source.value} created:>=${cutoff.slice(0, 10)} is:public`)}&sort=created&order=desc&per_page=100`,
-      ),
-    ]);
+// Split crowded intervals to get past GitHub's 1,000-result search limit.
+// A bounded request budget leaves exceptionally busy months explicitly incomplete.
+async function searchAll<T>(
+  endpoint: string,
+  query: string,
+  dateField: string,
+  from: string,
+  to: string,
+  budget: { remaining: number; deadline: number },
+): Promise<{ items: T[]; exhaustive: boolean }> {
+  if (budget.remaining <= 0 || Date.now() > budget.deadline)
+    return { items: [], exhaustive: false };
+  const q = `${query} ${dateField}:${from}..${to}`;
+  const page = async (number: number) => {
+    budget.remaining--;
+    return github<Search<T>>(
+      `/search/${endpoint}?q=${encodeURIComponent(q)}&sort=${endpoint === 'commits' ? 'author-date' : 'created'}&order=desc&per_page=100&page=${number}`,
+    );
+  };
+  const first = await page(1);
+  if (first.total_count > 1000 && Date.parse(to) - Date.parse(from) > 1000) {
+    const middle = Math.floor((Date.parse(from) + Date.parse(to)) / 2000) * 1000;
+    const left = await searchAll<T>(
+      endpoint,
+      query,
+      dateField,
+      from,
+      new Date(middle).toISOString(),
+      budget,
+    );
+    const right = await searchAll<T>(
+      endpoint,
+      query,
+      dateField,
+      new Date(middle + 1000).toISOString(),
+      to,
+      budget,
+    );
     return {
-      events: [
-        ...commits.items
-          .filter((c) => c.repository?.private === false)
-          .map((c) => commitActivity(c)),
-        ...issues.items.map((i) => issueActivity(i)),
-      ],
-      profileUrl: `https://github.com/${source.value}`,
-      coverage: `Last 90 days: up to 100 authored commits and 100 authored issues/PRs from public GitHub search. Found ${commits.total_count} commits and ${issues.total_count} issues/PRs. Reviews and merge actions are not included.${commits.incomplete_results || issues.incomplete_results ? ' GitHub returned incomplete search results.' : ''}`,
+      items: [...left.items, ...right.items],
+      exhaustive: left.exhaustive && right.exhaustive,
     };
   }
-  const repo = await github<{ private: boolean; size: number }>(`/repos/${source.value}`);
-  if (repo.private) throw new Error('Only public repositories are supported.');
-  const [commits, issues] = await Promise.all([
-    repo.size === 0
-      ? Promise.resolve([] as Commit[])
-      : github<Commit[]>(`/repos/${source.value}/commits?per_page=100&since=${cutoff}`),
-    github<Issue[]>(
-      `/repos/${source.value}/issues?state=all&sort=created&direction=desc&per_page=100&since=${cutoff}`,
-    ),
-  ]);
+  const items = [...first.items];
+  let exhaustive = !first.incomplete_results && first.total_count <= 1000;
+  const pages = Math.min(10, Math.ceil(first.total_count / 100));
+  for (let number = 2; number <= pages; number++) {
+    if (budget.remaining <= 0 || Date.now() > budget.deadline) {
+      exhaustive = false;
+      break;
+    }
+    const result = await page(number);
+    items.push(...result.items);
+    exhaustive &&= !result.incomplete_results;
+  }
+  return { items, exhaustive: exhaustive && items.length >= first.total_count };
+}
+async function collectGithub(source: Source, month: string): Promise<Snapshot> {
+  const bounds = monthBounds(month);
+  if (source.kind === 'repo') {
+    const repo = await github<{ private: boolean }>(`/repos/${source.value}`);
+    if (repo.private) throw new Error('Only public repositories are supported.');
+  } else await github(`/users/${source.value}`);
+  const query = `${source.kind === 'repo' ? 'repo' : 'author'}:${source.value} is:public`;
+  const budget = { remaining: 24, deadline: Date.now() + 35000 };
+  const commits = await searchAll<Commit>(
+    'commits',
+    query,
+    'author-date',
+    bounds.from,
+    bounds.to,
+    budget,
+  );
+  const issues = await searchAll<Issue>('issues', query, 'created', bounds.from, bounds.to, budget);
+  const exhaustive = commits.exhaustive && issues.exhaustive;
+  const events: Activity[] = [
+    ...commits.items
+      .filter((c) => c.repository.private === false)
+      .map((c) => ({
+        id: c.html_url,
+        timestamp: c.commit.author.date,
+        type: 'commit',
+        title: c.commit.message.split('\n')[0],
+        url: c.html_url,
+        actor: c.author?.login ?? c.commit.author.name,
+        repo: c.repository.full_name,
+      })),
+    ...issues.items.map((i) => ({
+      id: i.html_url,
+      timestamp: i.created_at,
+      type: i.pull_request ? 'pull request' : 'issue',
+      title: i.title,
+      url: i.html_url,
+      actor: i.user.login,
+      repo: i.repository_url.split('/repos/')[1],
+    })),
+  ];
   return {
-    events: [
-      ...commits.map((c) => commitActivity(c, source.value)),
-      ...issues.filter((i) => i.created_at >= cutoff).map((i) => issueActivity(i, source.value)),
-    ],
+    events: [...new Map(events.map((e) => [e.id, e])).values()],
     profileUrl: `https://github.com/${source.value}`,
-    coverage:
-      'Repository context, all contributors: last 90 days, up to 100 default-branch commits and 100 recently updated issues/PRs. This is not attributed to the supplied person.',
+    coverage: `${month}: ${exhaustive ? 'All returned search pages fetched' : 'Search incomplete; gaps are unknown'}. Public authored commits, issues and PRs only; reviews and merge actions are excluded. GitHub search indexing can omit activity.${source.kind === 'repo' ? ' Repository context includes all contributors.' : ''}`,
+    windows: [{ ...bounds, exhaustive, basis: 'github-search' }],
   };
 }
-
 const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
-function relayEvents(url: string, author: string): Promise<NostrEvent[]> {
+function relayEvents(
+  url: string,
+  author: string,
+  month: string,
+): Promise<{ events: NostrEvent[]; exhaustive: boolean }> {
   return new Promise((resolve, reject) => {
+    const bounds = monthBounds(month);
+    const since = Math.floor(Date.parse(bounds.from) / 1000);
+    let until = Math.floor(Date.parse(bounds.to) / 1000);
     const events = new Map<string, NostrEvent>();
+    let batch: NostrEvent[] = [];
+    let pages = 0;
+    let subscription = '';
     const ws = new WebSocket(url, { maxPayload: 128 * 1024, handshakeTimeout: 8000 });
     let finished = false;
-    const finish = (error?: string) => {
+    const finish = (exhaustive: boolean, error?: string) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       ws.terminate();
-      if (error) reject(new Error(error));
-      else resolve([...events.values()]);
+      if (error && !events.size) reject(new Error(error));
+      else resolve({ events: [...events.values()], exhaustive });
     };
-    const timer = setTimeout(() => finish('Relay timed out'), 12000);
-    ws.on('open', () =>
+    const timer = setTimeout(() => finish(false, 'Relay timed out'), 35000);
+    const request = () => {
+      batch = [];
+      subscription = `pow-${++pages}`;
       ws.send(
         JSON.stringify([
           'REQ',
-          'pow',
-          {
-            authors: [author],
-            kinds: [1],
-            since: Math.floor(Date.now() / 1000) - DAYS * 86400,
-            limit: 200,
-          },
+          subscription,
+          { authors: [author], kinds: [1], since, until, limit: 200 },
         ]),
-      ),
-    );
+      );
+    };
+    ws.on('open', request);
     ws.on('message', (raw) => {
       try {
         const message = JSON.parse(raw.toString());
-        if (message[1] !== 'pow') return;
-        if (message[0] === 'EOSE') {
-          finish();
-          return;
-        }
+        if (message[1] !== subscription) return;
         if (message[0] === 'CLOSED') {
-          finish('Relay refused the request');
+          finish(false, 'Relay refused request');
           return;
         }
-        if (message[0] === 'EVENT' && events.size < 200) {
+        if (message[0] === 'EOSE') {
+          ws.send(JSON.stringify(['CLOSE', subscription]));
+          // Continue even below the requested limit: relays may impose lower caps.
+          if (!batch.length) {
+            finish(true);
+            return;
+          }
+          const oldest = Math.min(...batch.map((e) => e.created_at));
+          if (pages >= 30 || oldest >= until) {
+            finish(false);
+            return;
+          }
+          until = oldest; // Overlap the last second to avoid dropping equal-timestamp events.
+          request();
+          return;
+        }
+        if (message[0] === 'EVENT' && batch.length < 200) {
           const e = message[2] as NostrEvent;
           if (
             e.pubkey === author &&
             e.kind === 1 &&
-            e.created_at * 1000 >= Date.parse(since()) &&
-            e.created_at <= Date.now() / 1000 + 300 &&
+            e.created_at >= since &&
+            e.created_at <= until &&
             verifyEvent(e)
-          )
+          ) {
+            batch.push(e);
             events.set(e.id, e);
+          }
         }
       } catch {
-        /* Ignore invalid or oversized protocol events. */
+        /* Ignore invalid protocol events. */
       }
     });
-    ws.on('error', () => finish('Relay unavailable'));
-    ws.on('close', () => finish('Relay closed before completing the request'));
+    ws.on('error', () => finish(false, 'Relay unavailable'));
+    ws.on('close', () => finish(false, 'Relay closed before completing request'));
   });
 }
-export async function collect(source: Source): Promise<Snapshot> {
-  if (source.kind !== 'nostr') return collectGithub(source);
-  const results = await Promise.allSettled(RELAYS.map((url) => relayEvents(url, source.value)));
+export async function collect(source: Source, month: string): Promise<Snapshot> {
+  if (source.kind !== 'nostr') return collectGithub(source, month);
+  const results = await Promise.allSettled(
+    RELAYS.map((url) => relayEvents(url, source.value, month)),
+  );
   const successful = results.filter((r) => r.status === 'fulfilled');
-  if (!successful.length)
-    throw new Error('Nostr relays are unavailable. Cached activity will be retained.');
+  if (!successful.length) throw new Error('Nostr relays unavailable; cached history is retained.');
   const events = new Map<string, NostrEvent>();
-  for (const result of successful) for (const e of result.value) events.set(e.id, e);
+  for (const result of successful) for (const e of result.value.events) events.set(e.id, e);
   return {
     events: [...events.values()].map((e) => ({
       id: e.id,
@@ -180,6 +251,13 @@ export async function collect(source: Source): Promise<Snapshot> {
       actor: source.label,
     })),
     profileUrl: `https://njump.me/${source.label}`,
-    coverage: `Last 90 days of signed text notes; up to 200 per relay. ${successful.length}/${RELAYS.length} relays responded (${RELAYS.map((r) => new URL(r).hostname).join(', ')}). Relay coverage is partial; notes with event references are labeled replies.`,
+    coverage: `${month}: paginated text notes from ${successful.length}/${RELAYS.length} relays. Relays can omit history; empty days cannot confirm inactivity. Notes with event references are labeled replies.`,
+    windows: [
+      {
+        ...monthBounds(month),
+        exhaustive: results.every((r) => r.status === 'fulfilled' && r.value.exhaustive),
+        basis: 'relay',
+      },
+    ],
   };
 }
