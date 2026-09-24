@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { QueueClient } from '@vercel/queue';
 import { claimRefresh, database, readCache, refresh } from './cache.js';
 import { RetryLater } from './rate-limit.js';
-import type { Source } from '../src/pow/model.js';
+import { hasPending, sourcePlatform, type Source } from '../src/pow/model.js';
 
 export const queue = new QueueClient({ region: 'iad1' });
 type Job = { source: Source; month: string; token: string };
@@ -21,7 +21,7 @@ export async function enqueue(source: Source, month: string) {
   if (!rows.length) return;
   try {
     await queue.send(
-      source.kind === 'nostr' ? 'pow-nostr' : 'pow-github',
+      sourcePlatform(source) === 'github' ? 'pow-github' : 'pow-nostr',
       { source, month, token },
       {
         idempotencyKey: token,
@@ -56,7 +56,7 @@ export const consume = queue.handleNodeCallback<Job>(
         if (!lease) throw new RetryLater(30);
         await refresh(source, lease, month);
         cached = await readCache(source, month);
-        if (cached.error || cached.snapshot?.pending?.length) {
+        if (cached.error || hasPending(cached.snapshot)) {
           throw new RetryLater(
             cached.retryAt
               ? Math.max(3, Math.ceil((Date.parse(cached.retryAt) - Date.now()) / 1000))
@@ -68,7 +68,7 @@ export const consume = queue.handleNodeCallback<Job>(
       if (!(error instanceof RetryLater)) throw error;
       // Publish the next checkpoint before acknowledging this delivery.
       await queue.send(
-        source.kind === 'nostr' ? 'pow-nostr' : 'pow-github',
+        sourcePlatform(source) === 'github' ? 'pow-github' : 'pow-nostr',
         { source, month, token },
         {
           idempotencyKey: `${metadata.messageId}:next`,

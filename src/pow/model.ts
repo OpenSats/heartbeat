@@ -79,7 +79,7 @@ export type SourceResult = {
 
 export function parseSource(kind: string, input: string): Source {
   let value = input.trim();
-  if (value.length > 500) throw new Error('Source is too long.');
+  if (value.length > 4000) throw new Error('Source is too long.');
   if (kind === 'github') {
     value = value
       .replace(/^https?:\/\/github\.com\//i, '')
