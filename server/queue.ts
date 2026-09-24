@@ -46,28 +46,46 @@ export const consume = queue.handleNodeCallback<Job>(
     await sql`UPDATE pow_sources SET queued_until = ${metadata.expiresAt.toISOString()}
     WHERE source_key = ${key} AND job_token = ${token}`;
     let cached = await readCache(source, month);
-    if (cached.stale && job.failure_count < 5) {
-      if (!cached.retry)
-        throw new RetryLater(
-          Math.max(3, Math.ceil((Date.parse(cached.retryAt!) - Date.now()) / 1000)),
-        );
-      const lease = await claimRefresh(source, month);
-      if (!lease) throw new RetryLater(30);
-      await refresh(source, lease, month);
-      cached = await readCache(source, month);
-      if (cached.error || cached.snapshot?.pending?.length) {
-        throw new RetryLater(
-          cached.retryAt
-            ? Math.max(3, Math.ceil((Date.parse(cached.retryAt) - Date.now()) / 1000))
-            : 3,
-        );
+    try {
+      if (cached.stale && job.failure_count < 5) {
+        if (!cached.retry)
+          throw new RetryLater(
+            Math.max(3, Math.ceil((Date.parse(cached.retryAt!) - Date.now()) / 1000)),
+          );
+        const lease = await claimRefresh(source, month);
+        if (!lease) throw new RetryLater(30);
+        await refresh(source, lease, month);
+        cached = await readCache(source, month);
+        if (cached.error || cached.snapshot?.pending?.length) {
+          throw new RetryLater(
+            cached.retryAt
+              ? Math.max(3, Math.ceil((Date.parse(cached.retryAt) - Date.now()) / 1000))
+              : 3,
+          );
+        }
       }
+    } catch (error) {
+      if (!(error instanceof RetryLater)) throw error;
+      // Publish the next checkpoint before acknowledging this delivery.
+      await queue.send(
+        source.kind === 'nostr' ? 'pow-nostr' : 'pow-github',
+        { source, month, token },
+        {
+          idempotencyKey: `${metadata.messageId}:next`,
+          delaySeconds: error.afterSeconds,
+          retentionSeconds: Math.max(
+            60,
+            Math.ceil((metadata.expiresAt.getTime() - Date.now()) / 1000),
+          ),
+        },
+      );
+      return;
     }
     await sql`UPDATE pow_sources SET queued_until = NULL,
     retry_at = CASE WHEN failure_count >= 5 THEN now() + interval '1 hour' ELSE retry_at END
     WHERE source_key = ${key} AND job_token = ${token}`;
   },
   {
-    retry: (error) => ({ afterSeconds: error instanceof RetryLater ? error.afterSeconds : 60 }),
+    retry: () => ({ afterSeconds: 60 }),
   },
 );
