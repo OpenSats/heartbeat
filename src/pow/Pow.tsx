@@ -3,9 +3,21 @@ import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
 import { HeartPulseIcon } from '../components/HeartPulseIcon';
 import { EVENT_TYPE_META } from '../eventTypes';
-import { historyMonths, sourcesFromUrl, type Source, type SourceResult } from './model';
+import {
+  activityRange,
+  FIRST_HISTORY_YEAR,
+  selectedYear,
+  historyMonths,
+  sourcesFromUrl,
+  type Source,
+  type SourceResult,
+} from './model';
 
-const oldestDay = new Date(Date.now() - 364 * 86400000).toISOString().slice(0, 10);
+const currentYear = new Date().getUTCFullYear();
+const years = Array.from(
+  { length: currentYear - FIRST_HISTORY_YEAR + 1 },
+  (_, i) => currentYear - i,
+);
 const initial = new URLSearchParams(window.location.search);
 const hasSources = (params: URLSearchParams) => ['p', 'gh', 'repo'].some((key) => params.has(key));
 const chipClass = (active = false) =>
@@ -20,9 +32,11 @@ const sourceColor = (source: Source) =>
       : 'text-emerald-300';
 
 function SourceStatus({
+  year,
   source,
   onResult,
 }: {
+  year: number | null;
   source: Source;
   onResult: (key: string, result: SourceResult) => void;
 }) {
@@ -30,7 +44,7 @@ function SourceStatus({
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    const months = historyMonths();
+    const months = historyMonths(year);
     const chunks = new Map<string, SourceResult>();
     const pause = (ms: number) =>
       new Promise<void>((resolve) => {
@@ -119,7 +133,7 @@ function SourceStatus({
     };
     void load();
     return () => controller.abort();
-  }, [source, onResult]);
+  }, [source, onResult, year]);
   const status =
     error || result?.error
       ? 'unavailable'
@@ -169,6 +183,7 @@ function SourceStatus({
 }
 
 function Heatmap({
+  year,
   platform,
   dates,
   selected,
@@ -176,6 +191,7 @@ function Heatmap({
   loading,
   coverage,
 }: {
+  year: number | null;
   platform: 'github' | 'nostr';
   dates: string[];
   selected: string;
@@ -189,13 +205,15 @@ function Heatmap({
       : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
   const counts = new Map<string, number>();
   for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
-  const today = new Date().toISOString().slice(0, 10);
-  const end = Date.parse(`${today}T00:00:00Z`);
-  const start = end - 364 * 86400000;
+  const range = activityRange(year);
+  const today = range.to;
+  const end = Date.parse(`${range.to}T00:00:00Z`);
+  const start = Date.parse(`${range.from}T00:00:00Z`);
+  const days = Math.round((end - start) / 86400000) + 1;
   const oldest = new Date(start).toISOString().slice(0, 10);
   const total = dates.filter((date) => date >= oldest && date <= today).length;
   const offset = new Date(start).getUTCDay();
-  const cells = Array.from({ length: Math.ceil((365 + offset) / 7) * 7 }, (_, i) => {
+  const cells = Array.from({ length: Math.ceil((days + offset) / 7) * 7 }, (_, i) => {
     const time = start + (i - offset) * 86400000;
     return time < start || time > end ? null : new Date(time).toISOString().slice(0, 10);
   });
@@ -204,7 +222,8 @@ function Heatmap({
       <div className="mb-2 flex items-center gap-3">
         <span className={platform === 'github' ? 'text-emerald-400' : 'text-violet-400'}>
           {total.toLocaleString()}{' '}
-          {platform === 'github' ? 'GitHub events' : 'Nostr posts and replies'} in the last year
+          {platform === 'github' ? 'GitHub events' : 'Nostr posts and replies'}{' '}
+          {year === null ? 'in the last year' : `in ${year}`}
         </span>
         {loading && <span className="text-zinc-600">backfilling...</span>}
         {selected && (
@@ -289,7 +308,13 @@ export function Pow() {
   const [npub, setNpub] = useState(initial.get('p') ?? '');
   const [repos, setRepos] = useState(initial.getAll('repo').join(', '));
   const [params, setParams] = useState(initial);
-  const [results, setResults] = useState<Record<string, SourceResult>>({});
+  const [periodResults, setPeriodResults] = useState<Record<string, Record<string, SourceResult>>>(
+    {},
+  );
+  const year = selectedYear(params.get('year'));
+  const periodKey = year === null ? 'recent' : String(year);
+  const results = useMemo(() => periodResults[periodKey] ?? {}, [periodResults, periodKey]);
+  const range = useMemo(() => activityRange(year), [year]);
   const [filter, setFilter] = useState('all');
   const [kind, setKind] = useState('all');
   const [query, setQuery] = useState('');
@@ -300,8 +325,9 @@ export function Pow() {
   const barRef = useRef<HTMLDivElement>(null);
   const { sources, errors } = useMemo(() => sourcesFromUrl(params), [params]);
   const onResult = useMemo(
-    () => (key: string, result: SourceResult) => setResults((prev) => ({ ...prev, [key]: result })),
-    [],
+    () => (key: string, result: SourceResult) =>
+      setPeriodResults((prev) => ({ ...prev, [periodKey]: { ...prev[periodKey], [key]: result } })),
+    [periodKey],
   );
   useEffect(() => {
     const el = barRef.current;
@@ -339,11 +365,15 @@ export function Pow() {
       )
         continue;
       for (const event of results[source.key]?.snapshot?.events ?? [])
-        if (event.timestamp.slice(0, 10) >= oldestDay && !all.has(event.id))
+        if (
+          event.timestamp.slice(0, 10) >= range.from &&
+          event.timestamp.slice(0, 10) <= range.to &&
+          !all.has(event.id)
+        )
           all.set(event.id, { event, source });
     }
     return [...all.values()].sort((a, b) => b.event.timestamp.localeCompare(a.event.timestamp));
-  }, [sources, results, filter]);
+  }, [sources, results, filter, range]);
   const types = [...new Set(events.map(({ event }) => event.type))].sort();
   const filtered = events.filter(
     ({ event }) =>
@@ -401,9 +431,22 @@ export function Pow() {
   };
   const activeDays = new Set(filtered.map(({ event }) => event.timestamp.slice(0, 10))).size;
   const repoCount = new Set(filtered.map(({ event }) => event.repo).filter(Boolean)).size;
+  function selectYear(value: number | null) {
+    const next = new URLSearchParams(params);
+    if (value === null) next.delete('year');
+    else next.set('year', String(value));
+    history.pushState(null, '', `/pow${next.size ? `?${next}` : ''}`);
+    setParams(next);
+    setDay('');
+    setKind('all');
+    setActor('');
+    setRepo('');
+    setQuery('');
+  }
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const next = new URLSearchParams();
+    if (year !== null) next.set('year', String(year));
     if (npub.trim()) next.set('p', npub.trim());
     for (const value of gh
       .split(',')
@@ -577,45 +620,79 @@ export function Pow() {
             )}
             <div>
               {sources.map((source) => (
-                <SourceStatus key={source.key} source={source} onResult={onResult} />
+                <SourceStatus
+                  key={`${periodKey}:${source.key}`}
+                  year={year}
+                  source={source}
+                  onResult={onResult}
+                />
               ))}
             </div>
           </>
         )}
       </div>
-      {(['github', 'nostr'] as const).map((platform) => {
-        const platformSources = sources.filter((source) =>
-          platform === 'nostr' ? source.kind === 'nostr' : source.kind !== 'nostr',
-        );
-        if (!platformSources.length) return null;
-        const activity = new Map(
-          platformSources.flatMap((source) =>
-            (results[source.key]?.snapshot?.events ?? []).map(
-              (event) => [event.id, event] as const,
-            ),
-          ),
-        );
-        return (
-          <Heatmap
-            key={platform}
-            platform={platform}
-            dates={[...activity.values()].map((event) => event.timestamp.slice(0, 10))}
-            selected={filter === platform ? day : ''}
-            onSelect={(date) => {
-              setDay(date);
-              setFilter(date ? platform : 'all');
-              setKind('all');
-              setQuery('');
-              setActor('');
-              setRepo('');
-            }}
-            loading={platformSources.some(
-              (source) => !results[source.key] || results[source.key].refreshing,
-            )}
-            coverage={(date) => coverage(date, platform)}
-          />
-        );
-      })}
+      {!!sources.length && (
+        <div className="flex flex-col-reverse lg:flex-row items-start">
+          <div className="min-w-0 flex-1 w-full">
+            {(['github', 'nostr'] as const).map((platform) => {
+              const platformSources = sources.filter((source) =>
+                platform === 'nostr' ? source.kind === 'nostr' : source.kind !== 'nostr',
+              );
+              if (!platformSources.length) return null;
+              const activity = new Map(
+                platformSources.flatMap((source) =>
+                  (results[source.key]?.snapshot?.events ?? []).map(
+                    (event) => [event.id, event] as const,
+                  ),
+                ),
+              );
+              return (
+                <Heatmap
+                  key={platform}
+                  year={year}
+                  platform={platform}
+                  dates={[...activity.values()].map((event) => event.timestamp.slice(0, 10))}
+                  selected={filter === platform ? day : ''}
+                  onSelect={(date) => {
+                    setDay(date);
+                    setFilter(date ? platform : 'all');
+                    setKind('all');
+                    setQuery('');
+                    setActor('');
+                    setRepo('');
+                  }}
+                  loading={platformSources.some(
+                    (source) => !results[source.key] || results[source.key].refreshing,
+                  )}
+                  coverage={(date) => coverage(date, platform)}
+                />
+              );
+            })}
+          </div>
+          <nav
+            aria-label="Activity year"
+            className="flex lg:flex-col gap-1 px-3 py-3 w-full lg:w-36 shrink-0 overflow-x-auto lg:overflow-y-auto lg:max-h-[420px] text-xs"
+          >
+            <button
+              aria-pressed={year === null}
+              className={`${chipClass(year === null)} shrink-0 text-left`}
+              onClick={() => selectYear(null)}
+            >
+              last 365 days
+            </button>
+            {years.map((value) => (
+              <button
+                key={value}
+                aria-pressed={year === value}
+                className={`${chipClass(year === value)} shrink-0 text-left`}
+                onClick={() => selectYear(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
       {!sources.length ? (
         <div className="text-zinc-500 px-2 py-8 text-sm">
           Enter a GitHub handle or npub to load activity.{' '}
@@ -640,8 +717,8 @@ export function Pow() {
           {visible.length} events · {activeDays} active days · {repoCount} repo(s)
         </div>
         <div>
-          window 365d · recent cache 24h · history cache 90d · timestamps UTC · {sources.length}{' '}
-          source(s)
+          {year === null ? 'window 365d' : `year ${year}`} · recent cache 24h · history cache 90d ·
+          timestamps UTC · {sources.length} source(s)
         </div>
       </footer>
     </div>
