@@ -192,6 +192,8 @@ function Heatmap({
   const today = new Date().toISOString().slice(0, 10);
   const end = Date.parse(`${today}T00:00:00Z`);
   const start = end - 364 * 86400000;
+  const oldest = new Date(start).toISOString().slice(0, 10);
+  const total = dates.filter((date) => date >= oldest && date <= today).length;
   const offset = new Date(start).getUTCDay();
   const cells = Array.from({ length: Math.ceil((365 + offset) / 7) * 7 }, (_, i) => {
     const time = start + (i - offset) * 86400000;
@@ -201,9 +203,10 @@ function Heatmap({
     <div className="px-3 py-3 border-b border-zinc-900 text-xs text-zinc-500">
       <div className="mb-2 flex items-center gap-3">
         <span className={platform === 'github' ? 'text-emerald-400' : 'text-violet-400'}>
-          {platform} · last 365 days
+          {total.toLocaleString()}{' '}
+          {platform === 'github' ? 'GitHub events' : 'Nostr posts and replies'} in the last year
         </span>
-        {loading && <span className="text-zinc-600">loading sources...</span>}
+        {loading && <span className="text-zinc-600">backfilling...</span>}
         {selected && (
           <button onClick={() => onSelect('')} className="text-zinc-300">
             {selected} ×
