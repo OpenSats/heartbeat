@@ -3,8 +3,9 @@ import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
 import { HeartPulseIcon } from '../components/HeartPulseIcon';
 import { EVENT_TYPE_META } from '../eventTypes';
-import { sourcesFromUrl, type Source, type SourceResult } from './model';
+import { historyMonths, sourcesFromUrl, type Source, type SourceResult } from './model';
 
+const oldestDay = new Date(Date.now() - 364 * 86400000).toISOString().slice(0, 10);
 const initial = new URLSearchParams(window.location.search);
 const hasSources = (params: URLSearchParams) => ['p', 'gh', 'repo'].some((key) => params.has(key));
 const chipClass = (active = false) =>
@@ -29,43 +30,95 @@ function SourceStatus({
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    let polls = 0;
+    const months = historyMonths();
+    const chunks = new Map<string, SourceResult>();
+    const pause = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          controller.signal.removeEventListener('abort', done);
+          resolve();
+        };
+        const timer = setTimeout(done, ms);
+        controller.signal.addEventListener('abort', done, { once: true });
+      });
+    const publish = (running: boolean, message: string | null = null) => {
+      if (controller.signal.aborted) return;
+      const values = [...chunks.values()];
+      const snapshots = values.flatMap((r) => (r.snapshot ? [r.snapshot] : []));
+      const windows = snapshots.flatMap((snapshot) => snapshot.windows ?? []);
+      const activities = new Map(
+        snapshots.flatMap((snapshot) => snapshot.events.map((event) => [event.id, event] as const)),
+      );
+      const combined: SourceResult = {
+        source,
+        snapshot: snapshots.length
+          ? {
+              events: [...activities.values()],
+              windows,
+              profileUrl: snapshots[0].profileUrl.replace('https://njump.me/', 'https://njump.to/'),
+              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from public relays. Relays can omit history, so empty days remain uncertain.' : 'Public authored commits, issues and PRs. Reviews and merge actions are excluded. GitHub indexing can omit activity.'}${source.kind === 'repo' ? ' Repository context includes all contributors.' : ''}`,
+            }
+          : null,
+        fetchedAt:
+          values
+            .map((r) => r.fetchedAt)
+            .filter((t): t is string => !!t)
+            .sort()
+            .at(-1) ?? null,
+        refreshing: running,
+        stale: values.some((r) => r.stale),
+        error: message ?? values.find((r) => r.error)?.error ?? null,
+        monthsLoaded: snapshots.length,
+        monthsTotal: months.length,
+      };
+      setResult(combined);
+      onResult(source.key, combined);
+    };
     const load = async () => {
-      try {
-        const query = new URLSearchParams({
-          kind: source.kind,
-          value: source.kind === 'nostr' ? source.label : source.value,
-        });
-        const response = await fetch(`/api/pow/source?${query}`, {
-          signal: controller.signal,
-          referrerPolicy: 'no-referrer',
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? 'Unable to load source.');
-        setResult(data);
-        onResult(source.key, data);
-        if (data.refreshing && polls++ < 20) timer = setTimeout(load, 3000);
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          const message = (e as Error).message;
-          setError(message);
-          onResult(source.key, {
-            source,
-            snapshot: null,
-            fetchedAt: null,
-            refreshing: false,
-            stale: true,
-            error: message,
-          });
+      for (const month of months) {
+        if (controller.signal.aborted) return;
+        let attempts = 0;
+        let finished = false;
+        while (!finished && !controller.signal.aborted) {
+          try {
+            const started = Date.now();
+            const query = new URLSearchParams({
+              kind: source.kind,
+              value: source.kind === 'nostr' ? source.label : source.value,
+              month,
+            });
+            const response = await fetch(`/api/pow/source?${query}`, {
+              signal: controller.signal,
+              referrerPolicy: 'no-referrer',
+            });
+            const data = (await response.json()) as SourceResult;
+            if (!response.ok) throw new Error(data.error ?? 'Unable to load source.');
+            chunks.set(month, data);
+            publish(true);
+            if (data.refreshing && attempts++ < 25) {
+              await pause(3000);
+              continue;
+            }
+            if (data.error && data.retryAt && attempts++ < 2 && data.error.includes('rate limit')) {
+              await pause(Math.max(3000, Date.parse(data.retryAt) - Date.now() + 1000));
+              continue;
+            }
+            finished = true;
+            if (source.kind !== 'nostr' && data.fetchedAt && Date.parse(data.fetchedAt) >= started)
+              await pause(5000);
+          } catch (e) {
+            if (controller.signal.aborted) return;
+            setError((e as Error).message);
+            publish(false, (e as Error).message);
+            return;
+          }
         }
       }
+      publish(false);
     };
     void load();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    return () => controller.abort();
   }, [source, onResult]);
   const status =
     error || result?.error
@@ -73,7 +126,7 @@ function SourceStatus({
       : !result
         ? 'fetching'
         : result.refreshing
-          ? 'refreshing'
+          ? `backfilling ${result.monthsLoaded ?? 0}/${result.monthsTotal ?? 13} months`
           : result.stale
             ? 'stale'
             : 'cached';
@@ -95,6 +148,12 @@ function SourceStatus({
               open source ↗
             </a>
             <p>{result.snapshot.coverage}</p>
+            {result.snapshot.windows?.map((window) => (
+              <p key={window.from}>
+                {window.from.slice(0, 7)}: {window.exhaustive ? 'pages fetched' : 'incomplete'}
+                {window.basis === 'relay' ? ' · relay coverage only' : ''}
+              </p>
+            ))}
           </>
         )}
         {result?.fetchedAt && (
@@ -121,26 +180,28 @@ function Heatmap({
   selected,
   onSelect,
   loading,
+  coverage,
 }: {
   dates: string[];
   selected: string;
   onSelect: (day: string) => void;
   loading: boolean;
+  coverage: (day: string) => boolean;
 }) {
   const counts = new Map<string, number>();
   for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
   const today = new Date().toISOString().slice(0, 10);
   const end = Date.parse(`${today}T00:00:00Z`);
-  const start = end - 89 * 86400000;
+  const start = end - 364 * 86400000;
   const offset = new Date(start).getUTCDay();
-  const cells = Array.from({ length: Math.ceil((90 + offset) / 7) * 7 }, (_, i) => {
+  const cells = Array.from({ length: Math.ceil((365 + offset) / 7) * 7 }, (_, i) => {
     const time = start + (i - offset) * 86400000;
     return time < start || time > end ? null : new Date(time).toISOString().slice(0, 10);
   });
   return (
     <div className="px-3 py-3 border-b border-zinc-900 text-xs text-zinc-500">
       <div className="mb-2 flex items-center gap-3">
-        <span>activity · last 90 days</span>
+        <span>activity · last 365 days</span>
         {loading && <span className="text-zinc-600">loading sources...</span>}
         {selected && (
           <button onClick={() => onSelect('')} className="text-zinc-300">
@@ -179,16 +240,24 @@ function Heatmap({
               if (!day) return <span key={i} className="h-3.5" />;
               const count = counts.get(day) ?? 0;
               const level = count === 0 ? 0 : count < 3 ? 1 : count < 6 ? 2 : count < 12 ? 3 : 4;
-              const label = `${day}: ${count} fetched event${count === 1 ? '' : 's'}`;
+              const complete = coverage(day);
+              const label = `${day}: ${count} fetched event${count === 1 ? '' : 's'}. ${complete ? 'GitHub search pages fetched for this day.' : 'Coverage incomplete or uncertain.'}`;
               return (
                 <button
                   key={day}
                   title={label}
                   aria-label={label}
                   aria-pressed={selected === day}
-                  disabled={loading}
+                  style={
+                    !complete
+                      ? {
+                          backgroundImage:
+                            'repeating-linear-gradient(135deg, transparent 0 3px, #a1a1aa66 3px 4px)',
+                        }
+                      : undefined
+                  }
                   onClick={() => onSelect(selected === day ? '' : day)}
-                  className={`h-3.5 w-3.5 rounded-[2px] ${loading ? 'bg-zinc-800 animate-pulse' : heatColors[level]} ${selected === day ? 'outline outline-1 outline-zinc-100' : 'hover:outline hover:outline-1 hover:outline-zinc-500'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-white`}
+                  className={`h-3.5 w-3.5 rounded-[2px] ${heatColors[level]} ${selected === day ? 'outline outline-1 outline-zinc-100' : 'hover:outline hover:outline-1 hover:outline-zinc-500'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-white`}
                 />
               );
             })}
@@ -203,7 +272,8 @@ function Heatmap({
         </div>
       </div>
       <p className="text-[10px] text-zinc-600 mt-2">
-        Empty cells mean no fetched events. Source limits and relay coverage can leave gaps.
+        Striped cells have incomplete or uncertain coverage. Plain empty cells have no indexed
+        GitHub activity in the fetched categories.
       </p>
     </div>
   );
@@ -260,7 +330,8 @@ export function Pow() {
     for (const source of sources) {
       if (filter !== 'all' && source.kind !== filter) continue;
       for (const event of results[source.key]?.snapshot?.events ?? [])
-        if (!all.has(event.id)) all.set(event.id, { event, source });
+        if (event.timestamp.slice(0, 10) >= oldestDay && !all.has(event.id))
+          all.set(event.id, { event, source });
     }
     return [...all.values()].sort((a, b) => b.event.timestamp.localeCompare(a.event.timestamp));
   }, [sources, results, filter]);
@@ -288,6 +359,7 @@ export function Pow() {
         : EVENT_TYPE_META[type as keyof typeof EVENT_TYPE_META];
     return {
       ...event,
+      url: event.url.replace('https://njump.me/', 'https://njump.to/'),
       type,
       meta,
       repo: event.repo ?? 'nostr',
@@ -300,7 +372,22 @@ export function Pow() {
       context: source.kind === 'repo' ? 'Repository activity from all contributors' : undefined,
     };
   });
-  const loading = sources.some((s) => !results[s.key]);
+  const loading = sources.some((s) => !results[s.key] || results[s.key].refreshing);
+  const coverage = (date: string) => {
+    const relevant = sources.filter((s) => filter === 'all' || s.kind === filter);
+    const from = Date.parse(`${date}T00:00:00Z`);
+    const to = from + 86400000 - 1;
+    return (
+      relevant.length > 0 &&
+      relevant.every(
+        (s) =>
+          s.kind !== 'nostr' &&
+          results[s.key]?.snapshot?.windows?.some(
+            (w) => w.exhaustive && Date.parse(w.from) <= from && Date.parse(w.to) >= to,
+          ),
+      )
+    );
+  };
   const activeDays = new Set(filtered.map(({ event }) => event.timestamp.slice(0, 10))).size;
   const repoCount = new Set(filtered.map(({ event }) => event.repo).filter(Boolean)).size;
   function submit(e: React.FormEvent) {
@@ -471,6 +558,7 @@ export function Pow() {
           selected={day}
           onSelect={setDay}
           loading={loading}
+          coverage={coverage}
         />
       )}
       {!sources.length ? (
@@ -496,7 +584,10 @@ export function Pow() {
         <div>
           {visible.length} events · {activeDays} active days · {repoCount} repo(s)
         </div>
-        <div>window 90d · cache 24h · timestamps UTC · {sources.length} source(s)</div>
+        <div>
+          window 365d · recent cache 24h · history cache 90d · timestamps UTC · {sources.length}{' '}
+          source(s)
+        </div>
       </footer>
     </div>
   );
