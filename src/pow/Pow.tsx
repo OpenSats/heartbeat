@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
-import { HeartPulseIcon } from '../components/HeartPulseIcon';
 import { EVENT_TYPE_META } from '../eventTypes';
 import {
   activityRange,
@@ -479,22 +478,19 @@ export function Pow() {
         className="sm:sticky sm:top-0 z-10 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur px-3 py-2 space-y-2"
       >
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <a
-              href="/"
-              className="flex items-center gap-1.5"
-              title="heartbeat"
-              aria-label="heartbeat"
-            >
-              <HeartPulseIcon className="h-7 w-7 shrink-0 text-zinc-100" />
-              <img
-                src="https://dergigi.com/assets/images/avatar.jpg"
-                alt=""
-                className="h-7 w-7 shrink-0 rounded-full object-cover"
-              />
-            </a>
-            <span className="text-xs text-zinc-500">/ pow</span>
-          </div>
+          <a
+            href="/"
+            className="flex items-center gap-1.5"
+            title="heartbeat"
+            aria-label="heartbeat/pow"
+          >
+            <img
+              src={`${import.meta.env.BASE_URL}opensats-mark.svg`}
+              alt=""
+              className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]"
+            />
+            <h1 className="text-zinc-100 text-base font-medium">heartbeat/pow</h1>
+          </a>
           <div className="flex items-center gap-3">
             <button
               className="p-1 text-zinc-500 hover:text-zinc-300"
