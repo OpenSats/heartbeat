@@ -65,7 +65,19 @@ export async function refresh(source: Source, token: string, month: string) {
   const key = `${source.key}:v2:${month}`;
   try {
     const snapshot = await collect(source, month);
+    // Bound a single response below Vercel's payload limit without implying full coverage.
+    snapshot.events = snapshot.events.map((event) => ({
+      ...event,
+      title: event.title.slice(0, 1000),
+    }));
     snapshot.events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    if (Buffer.byteLength(JSON.stringify(snapshot)) > 3_000_000) {
+      while (snapshot.events.length && Buffer.byteLength(JSON.stringify(snapshot)) > 3_000_000)
+        snapshot.events.splice(-100);
+      snapshot.windows = snapshot.windows?.map((window) => ({ ...window, exhaustive: false }));
+      snapshot.coverage +=
+        ' This unusually busy month exceeded the response size limit; coverage is incomplete.';
+    }
     await sql`UPDATE pow_sources SET snapshot = ${JSON.stringify(snapshot)}::jsonb, fetched_at = now(), error = NULL,
       retry_at = NULL, lease_until = NULL, lease_token = NULL WHERE source_key = ${key} AND lease_token = ${token}`;
   } catch (error) {
