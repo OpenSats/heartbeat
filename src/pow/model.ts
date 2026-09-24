@@ -37,13 +37,25 @@ export type Snapshot = {
   profileUrl: string;
   windows?: CoverageWindow[];
 };
-export function historyMonths(now = new Date()): string[] {
-  const oldest = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - 364 * 86400000,
-  );
-  const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+export const FIRST_HISTORY_YEAR = 2008;
+export function selectedYear(value: string | null, now = new Date()): number | null {
+  if (!value || !/^\d{4}$/.test(value)) return null;
+  const year = Number(value);
+  return year >= FIRST_HISTORY_YEAR && year <= now.getUTCFullYear() ? year : null;
+}
+export function activityRange(year: number | null = null, now = new Date()) {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const from =
+    year === null ? new Date(today.getTime() - 364 * 86400000) : new Date(Date.UTC(year, 0, 1));
+  const to =
+    year === null || year === now.getUTCFullYear() ? today : new Date(Date.UTC(year, 11, 31));
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
+export function historyMonths(year: number | null = null, now = new Date()): string[] {
+  const range = activityRange(year, now);
+  const month = new Date(`${range.to.slice(0, 7)}-01T00:00:00Z`);
   const result: string[] = [];
-  while (month.getTime() >= Date.UTC(oldest.getUTCFullYear(), oldest.getUTCMonth(), 1)) {
+  while (month.toISOString().slice(0, 7) >= range.from.slice(0, 7)) {
     result.push(month.toISOString().slice(0, 7));
     month.setUTCMonth(month.getUTCMonth() - 1);
   }
