@@ -168,26 +168,25 @@ function SourceStatus({
   );
 }
 
-const heatColors = [
-  'bg-zinc-900',
-  'bg-emerald-950',
-  'bg-emerald-800',
-  'bg-emerald-600',
-  'bg-emerald-400',
-];
 function Heatmap({
+  platform,
   dates,
   selected,
   onSelect,
   loading,
   coverage,
 }: {
+  platform: 'github' | 'nostr';
   dates: string[];
   selected: string;
   onSelect: (day: string) => void;
   loading: boolean;
   coverage: (day: string) => boolean;
 }) {
+  const heatColors =
+    platform === 'github'
+      ? ['bg-zinc-900', 'bg-emerald-950', 'bg-emerald-800', 'bg-emerald-600', 'bg-emerald-400']
+      : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
   const counts = new Map<string, number>();
   for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
   const today = new Date().toISOString().slice(0, 10);
@@ -201,7 +200,9 @@ function Heatmap({
   return (
     <div className="px-3 py-3 border-b border-zinc-900 text-xs text-zinc-500">
       <div className="mb-2 flex items-center gap-3">
-        <span>activity · last 365 days</span>
+        <span className={platform === 'github' ? 'text-emerald-400' : 'text-violet-400'}>
+          {platform} · last 365 days
+        </span>
         {loading && <span className="text-zinc-600">loading sources...</span>}
         {selected && (
           <button onClick={() => onSelect('')} className="text-zinc-300">
@@ -272,8 +273,9 @@ function Heatmap({
         </div>
       </div>
       <p className="text-[10px] text-zinc-600 mt-2">
-        Striped cells have incomplete or uncertain coverage. Plain empty cells have no indexed
-        GitHub activity in the fetched categories.
+        {platform === 'github'
+          ? 'Striped cells are incomplete. Plain empty cells have no indexed commits, issues or PRs in the fetched results.'
+          : 'Striped cells reflect uncertain relay coverage. An empty day does not confirm inactivity.'}
       </p>
     </div>
   );
@@ -328,7 +330,11 @@ export function Pow() {
       { event: NonNullable<SourceResult['snapshot']>['events'][number]; source: Source }
     >();
     for (const source of sources) {
-      if (filter !== 'all' && source.kind !== filter) continue;
+      if (
+        filter !== 'all' &&
+        (filter === 'github' ? source.kind === 'nostr' : source.kind !== filter)
+      )
+        continue;
       for (const event of results[source.key]?.snapshot?.events ?? [])
         if (event.timestamp.slice(0, 10) >= oldestDay && !all.has(event.id))
           all.set(event.id, { event, source });
@@ -373,8 +379,10 @@ export function Pow() {
     };
   });
   const loading = sources.some((s) => !results[s.key] || results[s.key].refreshing);
-  const coverage = (date: string) => {
-    const relevant = sources.filter((s) => filter === 'all' || s.kind === filter);
+  const coverage = (date: string, platform: 'github' | 'nostr') => {
+    const relevant = sources.filter((s) =>
+      platform === 'nostr' ? s.kind === 'nostr' : s.kind !== 'nostr',
+    );
     const from = Date.parse(`${date}T00:00:00Z`);
     const to = from + 86400000 - 1;
     return (
@@ -552,15 +560,39 @@ export function Pow() {
           </>
         )}
       </div>
-      {!!sources.length && (
-        <Heatmap
-          dates={filtered.map(({ event }) => event.timestamp.slice(0, 10))}
-          selected={day}
-          onSelect={setDay}
-          loading={loading}
-          coverage={coverage}
-        />
-      )}
+      {(['github', 'nostr'] as const).map((platform) => {
+        const platformSources = sources.filter((source) =>
+          platform === 'nostr' ? source.kind === 'nostr' : source.kind !== 'nostr',
+        );
+        if (!platformSources.length) return null;
+        const activity = new Map(
+          platformSources.flatMap((source) =>
+            (results[source.key]?.snapshot?.events ?? []).map(
+              (event) => [event.id, event] as const,
+            ),
+          ),
+        );
+        return (
+          <Heatmap
+            key={platform}
+            platform={platform}
+            dates={[...activity.values()].map((event) => event.timestamp.slice(0, 10))}
+            selected={filter === platform ? day : ''}
+            onSelect={(date) => {
+              setDay(date);
+              setFilter(date ? platform : 'all');
+              setKind('all');
+              setQuery('');
+              setActor('');
+              setRepo('');
+            }}
+            loading={platformSources.some(
+              (source) => !results[source.key] || results[source.key].refreshing,
+            )}
+            coverage={(date) => coverage(date, platform)}
+          />
+        );
+      })}
       {!sources.length ? (
         <div className="text-zinc-500 px-2 py-8 text-sm">
           Enter a GitHub handle or npub to load activity.{' '}
