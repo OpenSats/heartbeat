@@ -86,6 +86,6 @@ export const consume = queue.handleNodeCallback<Job>(
     WHERE source_key = ${key} AND job_token = ${token}`;
   },
   {
-    retry: () => ({ afterSeconds: 60 }),
+    visibilityTimeoutSeconds: 90,
   },
 );
