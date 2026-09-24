@@ -185,6 +185,7 @@ function SourceStatus({
 function Heatmap({
   year,
   platform,
+  filteredView,
   dates,
   selected,
   onSelect,
@@ -193,6 +194,7 @@ function Heatmap({
 }: {
   year: number | null;
   platform: 'github' | 'nostr';
+  filteredView: boolean;
   dates: string[];
   selected: string;
   onSelect: (day: string) => void;
@@ -221,7 +223,7 @@ function Heatmap({
     <div className="px-3 py-3 border-b border-zinc-900 text-xs text-zinc-500">
       <div className="mb-2 flex items-center gap-3">
         <span className={platform === 'github' ? 'text-emerald-400' : 'text-violet-400'}>
-          {total.toLocaleString()}{' '}
+          {total.toLocaleString()} {filteredView ? 'matching ' : ''}
           {platform === 'github' ? 'GitHub events' : 'Nostr posts and replies'}{' '}
           {year === null ? 'in the last year' : `in ${year}`}
         </span>
@@ -264,7 +266,7 @@ function Heatmap({
               const count = counts.get(day) ?? 0;
               const level = count === 0 ? 0 : count < 3 ? 1 : count < 6 ? 2 : count < 12 ? 3 : 4;
               const complete = coverage(day);
-              const label = `${day}: ${count} fetched event${count === 1 ? '' : 's'}. ${complete ? 'GitHub search pages fetched for this day.' : 'Coverage incomplete or uncertain.'}`;
+              const label = `${day}: ${count} ${filteredView ? 'matching ' : ''}fetched event${count === 1 ? '' : 's'}. ${complete ? 'GitHub search pages fetched for this day.' : 'Coverage incomplete or uncertain.'}`;
               return (
                 <button
                   key={day}
@@ -296,7 +298,7 @@ function Heatmap({
       </div>
       <p className="text-[10px] text-zinc-600 mt-2">
         {platform === 'github'
-          ? 'Striped cells are incomplete. Plain empty cells have no indexed commits, issues or PRs in the fetched results.'
+          ? 'Striped cells are incomplete. Plain empty cells have no fetched GitHub events matching the current filters.'
           : 'Striped cells reflect uncertain relay coverage. An empty day does not confirm inactivity.'}
       </p>
     </div>
@@ -649,29 +651,27 @@ export function Pow() {
                     : source.kind !== 'nostr',
               );
               if (!platformSources.length) return null;
-              const activity = new Map(
-                platformSources.flatMap((source) =>
-                  (results[source.key]?.snapshot?.events ?? []).map(
-                    (event) => [event.id, event] as const,
-                  ),
-                ),
+              if (
+                kind !== 'all' &&
+                (['post', 'reply'].includes(kind) ? platform !== 'nostr' : platform !== 'github')
+              )
+                return null;
+              const activity = filtered.filter(({ source }) =>
+                platform === 'nostr' ? source.kind === 'nostr' : source.kind !== 'nostr',
               );
               return (
                 <Heatmap
                   key={platform}
                   year={year}
                   platform={platform}
-                  dates={[...activity.values()].map((event) => event.timestamp.slice(0, 10))}
+                  filteredView={kind !== 'all' || !!query || !!actor || !!repo}
+                  dates={activity.map(({ event }) => event.timestamp.slice(0, 10))}
                   selected={
                     filter === platform || (filter === 'repo' && platform === 'github') ? day : ''
                   }
                   onSelect={(date) => {
                     setDay(date);
                     if (date && filter !== 'repo') setFilter(platform);
-                    setKind('all');
-                    setQuery('');
-                    setActor('');
-                    setRepo('');
                   }}
                   loading={platformSources.some(
                     (source) => !results[source.key] || results[source.key].refreshing,
