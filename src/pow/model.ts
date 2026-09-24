@@ -1,8 +1,9 @@
-import { nip19 } from 'nostr-tools';
+import { nip19, type Filter } from 'nostr-tools';
+import { parseGrasp } from './ngit.js';
 
 export type Source = {
   key: string;
-  kind: 'github' | 'nostr' | 'repo';
+  kind: 'github' | 'nostr' | 'repo' | 'ngit' | 'grasp';
   value: string;
   label: string;
 };
@@ -29,7 +30,10 @@ export type SearchTask = {
   total?: number;
   seen?: number;
 };
+export type RelayTask = { url: string; filters: Filter[]; until: number; failures?: number };
 export type Snapshot = {
+  pendingRelays?: RelayTask[];
+  relayIncomplete?: boolean;
   pending?: SearchTask[];
   searchIncomplete?: boolean;
   events: Activity[];
@@ -86,17 +90,22 @@ export function parseSource(kind: string, input: string): Source {
       throw new Error('Enter a GitHub handle or profile URL.');
     return { key: `github:${value}`, kind, value, label: value };
   }
-  if (kind === 'nostr') {
+  if (kind === 'nostr' || kind === 'ngit') {
     value = value.replace(/^nostr:/, '');
     const decoded = nip19.decode(value);
     if (decoded.type !== 'npub') throw new Error('Enter a Nostr npub.');
     return {
-      key: `nostr:${decoded.data}`,
+      key: `${kind}:${decoded.data}`,
       kind,
       value: decoded.data,
       label: nip19.npubEncode(decoded.data),
     };
   }
+  if (
+    kind === 'grasp' ||
+    (kind === 'repo' && /^(nostr:|naddr1|https:\/\/(?!github\.com\/))/i.test(value))
+  )
+    return parseGrasp(value);
   if (kind === 'repo') {
     value = value
       .replace(/^https?:\/\/github\.com\//i, '')
@@ -107,7 +116,7 @@ export function parseSource(kind: string, input: string): Source {
       !/^[a-z0-9-]+\/[a-z0-9_.-]+$/.test(value) ||
       value.split('/').some((v) => v === '.' || v === '..')
     )
-      throw new Error('The MVP supports GitHub repositories: owner/repo or a github.com URL.');
+      throw new Error('Use owner/repo, a GitHub URL, nostr://npub/repo, an naddr, or a GRASP URL.');
     return { key: `repo:${value}`, kind, value, label: value };
   }
   throw new Error('Unknown source type.');
@@ -119,12 +128,17 @@ export function sourcesFromUrl(params: URLSearchParams) {
   for (const [parameter, kind] of [
     ['p', 'nostr'],
     ['gh', 'github'],
+    ['ngit', 'ngit'],
     ['repo', 'repo'],
   ]) {
     for (const input of params.getAll(parameter).filter(Boolean)) {
       try {
         const source = parseSource(kind, input);
         sources.set(source.key, source);
+        if (kind === 'nostr') {
+          const code = parseSource('ngit', input);
+          sources.set(code.key, code);
+        }
       } catch (error) {
         errors.push(`${parameter}: ${(error as Error).message}`);
       }
@@ -132,4 +146,24 @@ export function sourcesFromUrl(params: URLSearchParams) {
   }
   if (sources.size > 8) errors.push('Showing the first 8 sources.');
   return { sources: [...sources.values()].slice(0, 8), errors };
+}
+
+export function hasPending(snapshot: Snapshot | null | undefined) {
+  return !!(snapshot?.pending?.length || snapshot?.pendingRelays?.length);
+}
+export function sourcePlatform(source: Source): 'github' | 'nostr' | 'ngit' {
+  return source.kind === 'nostr'
+    ? 'nostr'
+    : source.kind === 'ngit' || source.kind === 'grasp'
+      ? 'ngit'
+      : 'github';
+}
+export function isRepository(source: Source) {
+  return source.kind === 'repo' || source.kind === 'grasp';
+}
+export function matchesSource(source: Source, filter: string) {
+  return (
+    filter === 'all' ||
+    (filter === 'repo' ? isRepository(source) : sourcePlatform(source) === filter)
+  );
 }

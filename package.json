@@ -20,6 +20,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/functions": "^3.9.9",
     "@vercel/queue": "^0.6.0",
+    "ipaddr.js": "^2.5.0",
     "nostr-tools": "^2.25.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
