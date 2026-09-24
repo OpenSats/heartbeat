@@ -4,6 +4,9 @@ import type { TimelineEvent } from '../components/EventRow';
 import { EVENT_TYPE_META } from '../eventTypes';
 import {
   activityRange,
+  sourcePlatform,
+  isRepository,
+  matchesSource,
   FIRST_HISTORY_YEAR,
   selectedYear,
   historyMonths,
@@ -18,7 +21,8 @@ const years = Array.from(
   (_, i) => currentYear - i,
 );
 const initial = new URLSearchParams(window.location.search);
-const hasSources = (params: URLSearchParams) => ['p', 'gh', 'repo'].some((key) => params.has(key));
+const hasSources = (params: URLSearchParams) =>
+  ['p', 'gh', 'ngit', 'repo'].some((key) => params.has(key));
 const chipClass = (active = false) =>
   `px-2 py-1 sm:py-0.5 text-xs rounded border transition ${active ? 'border-zinc-500 bg-zinc-800 text-zinc-100' : 'border-zinc-800 bg-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'}`;
 const inputClass = `${chipClass()} min-w-0 flex-1 max-w-md placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 focus:text-zinc-100`;
@@ -26,7 +30,7 @@ const short = (s: string) => (s.startsWith('npub') ? `${s.slice(0, 12)}…${s.sl
 const sourceColor = (source: Source) =>
   source.kind === 'nostr'
     ? 'text-violet-300'
-    : source.kind === 'repo'
+    : isRepository(source) || source.kind === 'ngit'
       ? 'text-amber-300'
       : 'text-emerald-300';
 
@@ -70,7 +74,7 @@ function SourceStatus({
               events: [...activities.values()],
               windows,
               profileUrl: snapshots[0].profileUrl.replace('https://njump.me/', 'https://njump.to/'),
-              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from public relays. Relays can omit history, so empty days remain uncertain.' : 'Public authored commits, issues and PRs. Reviews and merge actions are excluded. GitHub indexing can omit activity.'}${source.kind === 'repo' ? ' Repository context includes all contributors.' : ''}`,
+              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from public relays. Relays can omit history, so empty days remain uncertain.' : sourcePlatform(source) === 'ngit' ? 'Signed patches, PRs, issues, code comments, status messages and repository updates. Ref updates are not individual commits. Relays may omit history or replace older state.' : 'Public authored commits, issues and PRs. Reviews and merge actions are excluded. GitHub indexing can omit activity.'}${isRepository(source) ? ' Repository context includes all contributors.' : ''}${source.kind === 'grasp' ? ' Comments and status messages without repository tags may be missing.' : ''}`,
             }
           : null,
         fetchedAt:
@@ -91,7 +95,7 @@ function SourceStatus({
     const fetchMonth = async (month: string) => {
       const query = new URLSearchParams({
         kind: source.kind,
-        value: source.kind === 'nostr' ? source.label : source.value,
+        value: ['nostr', 'ngit'].includes(source.kind) ? source.label : source.value,
         month,
       });
       const response = await fetch(`/api/pow/source?${query}`, {
@@ -145,7 +149,7 @@ function SourceStatus({
         </span>{' '}
         <span className={status === 'unavailable' ? 'text-amber-400' : ''}>{status}</span>
         {result?.snapshot && <span> · {result.snapshot.events.length} events</span>}
-        {source.kind === 'repo' && <span> · all contributors</span>}
+        {isRepository(source) && <span> · all contributors</span>}
       </summary>
       <div className="pl-4 py-1 space-y-1 max-w-3xl">
         {result?.snapshot && (
@@ -185,7 +189,7 @@ function Heatmap({
   coverage,
 }: {
   year: number | null;
-  platform: 'github' | 'nostr';
+  platform: 'github' | 'nostr' | 'ngit';
   filteredView: boolean;
   dates: string[];
   selected: string;
@@ -196,7 +200,9 @@ function Heatmap({
   const heatColors =
     platform === 'github'
       ? ['bg-zinc-900', 'bg-emerald-950', 'bg-emerald-800', 'bg-emerald-600', 'bg-emerald-400']
-      : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
+      : platform === 'ngit'
+        ? ['bg-zinc-900', 'bg-amber-950', 'bg-amber-800', 'bg-amber-600', 'bg-amber-400']
+        : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
   const counts = new Map<string, number>();
   for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
   const range = activityRange(year);
@@ -214,9 +220,21 @@ function Heatmap({
   return (
     <div className="px-3 py-3 border-b border-zinc-900 text-xs text-zinc-500">
       <div className="mb-2 flex items-center gap-3">
-        <span className={platform === 'github' ? 'text-emerald-400' : 'text-violet-400'}>
+        <span
+          className={
+            platform === 'github'
+              ? 'text-emerald-400'
+              : platform === 'ngit'
+                ? 'text-amber-400'
+                : 'text-violet-400'
+          }
+        >
           {total.toLocaleString()} {filteredView ? 'matching ' : ''}
-          {platform === 'github' ? 'GitHub events' : 'Nostr posts and replies'}{' '}
+          {platform === 'github'
+            ? 'GitHub events'
+            : platform === 'ngit'
+              ? 'ngit / GRASP events'
+              : 'Nostr posts and replies'}{' '}
           {year === null ? 'in the last year' : `in ${year}`}
         </span>
         {loading && <span className="text-zinc-600">backfilling...</span>}
@@ -353,11 +371,7 @@ export function Pow() {
       { event: NonNullable<SourceResult['snapshot']>['events'][number]; source: Source }
     >();
     for (const source of sources) {
-      if (
-        filter !== 'all' &&
-        (filter === 'github' ? source.kind === 'nostr' : source.kind !== filter)
-      )
-        continue;
+      if (!matchesSource(source, filter)) continue;
       for (const event of results[source.key]?.snapshot?.events ?? [])
         if (
           event.timestamp.slice(0, 10) >= range.from &&
@@ -389,30 +403,39 @@ export function Pow() {
     const meta =
       type === 'post' || type === 'reply'
         ? { label: type, sigil: type === 'post' ? '+' : '↳', colorClass: 'text-violet-400' }
-        : EVENT_TYPE_META[type as keyof typeof EVENT_TYPE_META];
+        : (EVENT_TYPE_META[type as keyof typeof EVENT_TYPE_META] ?? {
+            label: type,
+            sigil:
+              type === 'patch'
+                ? '+'
+                : type === 'refs update'
+                  ? '↑'
+                  : type === 'code comment'
+                    ? '↳'
+                    : '·',
+            colorClass: 'text-amber-400',
+          });
     return {
       ...event,
       url: event.url.replace('https://njump.me/', 'https://njump.to/'),
       type,
       meta,
-      repo: event.repo ?? 'nostr',
+      repo: event.repo ?? sourcePlatform(source),
       shortId:
-        type === 'commit'
-          ? event.url.split('/').at(-1)!.slice(0, 7)
-          : type === 'post' || type === 'reply'
-            ? type
-            : `#${event.url.split('/').at(-1)}`,
-      context: source.kind === 'repo' ? 'Repository activity from all contributors' : undefined,
+        sourcePlatform(source) === 'ngit'
+          ? event.id.slice(0, 8)
+          : type === 'commit'
+            ? event.url.split('/').at(-1)!.slice(0, 7)
+            : type === 'post' || type === 'reply'
+              ? type
+              : `#${event.url.split('/').at(-1)}`,
+      context: isRepository(source) ? 'Repository activity from all contributors' : undefined,
     };
   });
   const loading = sources.some((s) => !results[s.key] || results[s.key].refreshing);
-  const coverage = (date: string, platform: 'github' | 'nostr') => {
-    const relevant = sources.filter((s) =>
-      platform === 'nostr'
-        ? s.kind === 'nostr'
-        : filter === 'repo'
-          ? s.kind === 'repo'
-          : s.kind !== 'nostr',
+  const coverage = (date: string, platform: 'github' | 'nostr' | 'ngit') => {
+    const relevant = sources.filter(
+      (s) => sourcePlatform(s) === platform && matchesSource(s, filter),
     );
     const from = Date.parse(`${date}T00:00:00Z`);
     const to = from + 86400000 - 1;
@@ -420,7 +443,7 @@ export function Pow() {
       relevant.length > 0 &&
       relevant.every(
         (s) =>
-          s.kind !== 'nostr' &&
+          sourcePlatform(s) === 'github' &&
           results[s.key]?.snapshot?.windows?.some(
             (w) => w.exhaustive && Date.parse(w.from) <= from && Date.parse(w.to) >= to,
           ),
@@ -556,7 +579,7 @@ export function Pow() {
                 <span className="text-zinc-600 text-xs shrink-0 w-14">repos:</span>
                 <input
                   className={inputClass}
-                  placeholder="owner/repo, owner/another-repo"
+                  placeholder="owner/repo, nostr://npub/repo, GRASP URL"
                   value={repos}
                   onChange={(e) => setRepos(e.target.value)}
                   spellCheck={false}
@@ -575,7 +598,7 @@ export function Pow() {
           <>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-zinc-600 text-xs shrink-0 w-14">source:</span>
-              {['all', 'github', 'nostr', 'repo'].map((value) => (
+              {['all', 'github', 'nostr', 'ngit', 'repo'].map((value) => (
                 <button
                   key={value}
                   className={chipClass(filter === value)}
@@ -663,25 +686,19 @@ export function Pow() {
       {!!sources.length && (
         <div className="w-full">
           <div className="min-w-0 flex-1 w-full">
-            {(['github', 'nostr'] as const).map((platform) => {
-              if (filter !== 'all' && platform !== (filter === 'repo' ? 'github' : filter))
-                return null;
-              const platformSources = sources.filter((source) =>
-                platform === 'nostr'
-                  ? source.kind === 'nostr'
-                  : filter === 'repo'
-                    ? source.kind === 'repo'
-                    : source.kind !== 'nostr',
+            {(['github', 'nostr', 'ngit'] as const).map((platform) => {
+              const platformSources = sources.filter(
+                (source) => sourcePlatform(source) === platform && matchesSource(source, filter),
               );
               if (!platformSources.length) return null;
               if (
                 kind !== 'all' &&
-                (['post', 'reply'].includes(kind) ? platform !== 'nostr' : platform !== 'github')
+                !events.some(
+                  ({ event, source }) => sourcePlatform(source) === platform && event.type === kind,
+                )
               )
                 return null;
-              const activity = filtered.filter(({ source }) =>
-                platform === 'nostr' ? source.kind === 'nostr' : source.kind !== 'nostr',
-              );
+              const activity = filtered.filter(({ source }) => sourcePlatform(source) === platform);
               return (
                 <Heatmap
                   key={platform}
@@ -689,9 +706,7 @@ export function Pow() {
                   platform={platform}
                   filteredView={kind !== 'all' || !!query || !!actor || !!repo}
                   dates={activity.map(({ event }) => event.timestamp.slice(0, 10))}
-                  selected={
-                    filter === platform || (filter === 'repo' && platform === 'github') ? day : ''
-                  }
+                  selected={filter === platform || filter === 'repo' ? day : ''}
                   onSelect={(date) => {
                     setDay(date);
                     if (date && filter !== 'repo') setFilter(platform);
@@ -721,7 +736,7 @@ export function Pow() {
           events={timeline}
           onSelectActor={setActor}
           onSelectRepo={(value) => {
-            if (value !== 'nostr') setRepo(value);
+            if (!['nostr', 'ngit'].includes(value)) setRepo(value);
           }}
         />
       )}
