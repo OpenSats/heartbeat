@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
+import { RetryLater } from './rate-limit.js';
 import { collect, monthBounds } from './collect.js';
 import type { Snapshot, Source, SourceResult } from '../src/pow/model.js';
 
@@ -12,6 +13,7 @@ type Row = {
   fetched_at: string | null;
   retry_at: string | null;
   lease_until: string | null;
+  queued_until: string | null;
   error: string | null;
 };
 export async function readCache(
@@ -21,7 +23,7 @@ export async function readCache(
   const sql = database();
   const key = `${source.key}:v3:${month}`;
   const rows =
-    await sql`SELECT snapshot, fetched_at, retry_at, lease_until, error FROM pow_sources WHERE source_key = ${key}`;
+    await sql`SELECT snapshot, fetched_at, retry_at, lease_until, queued_until, error FROM pow_sources WHERE source_key = ${key}`;
   const row = rows[0] as Row | undefined;
   const now = Date.now();
   const closedMonthNeedsRefresh =
@@ -40,7 +42,9 @@ export async function readCache(
     source,
     snapshot: row?.snapshot ?? null,
     fetchedAt: row?.fetched_at ? new Date(row.fetched_at).toISOString() : null,
-    refreshing: !!row?.lease_until && Date.parse(row.lease_until) > now,
+    refreshing:
+      (!!row?.lease_until && Date.parse(row.lease_until) > now) ||
+      (!!row?.queued_until && Date.parse(row.queued_until) > now),
     stale: !row?.fetched_at || Date.parse(row.fetched_at) < now - ttl,
     retry: !row?.retry_at || Date.parse(row.retry_at) <= now,
     error: row?.error ?? null,
@@ -52,12 +56,6 @@ export async function claimRefresh(source: Source, month: string) {
   const key = `${source.key}:v3:${month}`;
   const closedMonth = month !== new Date().toISOString().slice(0, 7);
   const end = monthBounds(month).to;
-  // A single global hourly budget bounds public cache-miss abuse. No visitor or URL records.
-  const budget = await sql`
-    INSERT INTO pow_budget (bucket, attempts) VALUES (date_trunc('hour', now()), 1)
-    ON CONFLICT (bucket) DO UPDATE SET attempts = pow_budget.attempts + 1 WHERE pow_budget.attempts < 120
-    RETURNING attempts`;
-  if (!budget.length) return null;
   const token = randomUUID();
   const lease = await sql`
     INSERT INTO pow_sources (source_key, lease_token, lease_until) VALUES (${key}, ${token}, now() + interval '90 seconds')
@@ -89,11 +87,12 @@ export async function refresh(source: Source, token: string, month: string) {
       snapshot.coverage +=
         ' This unusually busy month exceeded the response size limit; coverage is incomplete.';
     }
-    await sql`UPDATE pow_sources SET snapshot = ${JSON.stringify(snapshot)}::jsonb, fetched_at = now(), error = NULL,
+    await sql`UPDATE pow_sources SET snapshot = ${JSON.stringify(snapshot)}::jsonb, fetched_at = now(), error = NULL, failure_count = 0,
       retry_at = NULL, lease_until = NULL, lease_token = NULL WHERE source_key = ${key} AND lease_token = ${token}`;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Source unavailable.';
-    await sql`UPDATE pow_sources SET error = ${message.slice(0, 250)}, retry_at = now() + interval '2 minutes',
+    const delay = error instanceof RetryLater ? error.afterSeconds : 120;
+    await sql`UPDATE pow_sources SET error = ${message.slice(0, 250)}, failure_count = failure_count + ${error instanceof RetryLater ? 0 : 1}, retry_at = now() + ${delay} * interval '1 second',
       lease_until = NULL, lease_token = NULL WHERE source_key = ${key} AND lease_token = ${token}`;
   }
 }
