@@ -2,8 +2,9 @@
 
 ## PoW activity explorer (MVP)
 
-Open `/pow?gh=dergigi` or supply `p=npub…` and repeated `repo=owner/repo`
-parameters. The browser combines sources; the backend accepts exactly one source
+Open `/pow/dergigi`, `/pow/fiatjaf.com`, or `/pow/npub…`. Handles load
+GitHub; domains and NIP-05 identifiers resolve to Nostr. Existing `/pow?gh=dergigi`
+links and `p=npub…` or repeated `repo=owner/repo` parameters also work. The browser combines sources; the backend accepts exactly one source
 per request. No person registry, identity mappings, or combined reports are stored.
 
 `/api/pow/source?kind=github&value=dergigi` uses a Neon Postgres source cache.
@@ -29,6 +30,11 @@ fields, or social links. These are references, not ownership proofs. In the othe
 direction, NIP-39 `github:` claims are read from signed kind-10011 lists (with
 legacy kind-0 fallback) and loaded only when a public, single-file gist has the
 claimed GitHub owner and the exact NIP-39 verification text for that npub.
+A root website in a GitHub profile can also resolve through NIP-05. In the
+reverse direction, a signed Nostr profile can suggest a GitHub handle through
+its GitHub website link or the first label of its root NIP-05 domain. That
+candidate is loaded only when its GitHub profile links back to the same npub
+or qualifying NIP-05 domain; a matching name alone is insufficient.
 Profile READMEs and unproven GitHub mentions in Nostr bios are not scanned.
 The browser matches the evidence and adds discovered accounts to the URL without
 a confirmation step, preserving filters and the eight-source limit. Public
