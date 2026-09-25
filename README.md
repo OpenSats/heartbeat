@@ -43,7 +43,8 @@ fields, or social links. These are references, not ownership proofs. In the othe
 direction, NIP-39 `github:` claims are read from signed kind-10011 lists (with
 legacy kind-0 fallback) and loaded only when a public, single-file gist has the
 claimed GitHub owner and the exact NIP-39 verification text for that npub.
-A root website in a GitHub profile can also resolve through NIP-05. In the
+A root website or a `njump.to`/`njump.me` NIP-05 link in a GitHub profile can
+also resolve through NIP-05. In the
 reverse direction, a signed Nostr profile can suggest a GitHub handle through
 its GitHub website link or the first label of its root NIP-05 domain. That
 candidate is loaded only when its GitHub profile links back to the same npub
@@ -51,8 +52,11 @@ or qualifying NIP-05 domain; a matching name alone is insufficient.
 Profile READMEs and unproven GitHub mentions in Nostr bios are not scanned.
 The browser matches the evidence and adds discovered accounts to the URL without
 a confirmation step, preserving filters and the eight-source limit. Public
-profiles and gists are cached independently at the CDN for one hour; discovery
-creates no database records or stored cross-account mappings.
+profiles and gists are cached independently at the CDN for one hour. GitHub
+profile documents, including social links, are also cached per handle in Postgres
+for one hour, with up to 24 hours of stale reuse during outages. The browser
+retries throttled discovery requests using the server’s retry delay. Discovery
+never stores cross-account mappings.
 
 An `npub` in `p=` loads both text notes and ngit activity. Use `ngit=npub…`
 to load code activity alone. NIP-34 patches, PRs, PR updates, issues, NIP-22 code
@@ -253,3 +257,38 @@ tracked; `build:vercel` runs `npm run fetch && npm run build` once per deploymen
 refreshes, save a Vercel Deploy Hook URL as the `VERCEL_DEPLOY_HOOK_URL` repo
 secret and the included [`refresh.yml`](.github/workflows/refresh.yml)
 workflow pings it every 6 hours.
+
+## Example URLs
+
+Use these paths on your Heartbeat deployment:
+
+- `/pow`
+- `/pow/l0rinc`
+- `/pow/dtonon`
+- `/pow/dergigi`
+- `/pow/fiatjaf`
+- `/pow/adi2011`
+- `/pow/pablof7z`
+- `/pow/lovvtide`
+- `/pow/tnblumer`
+- `/pow/D33r-Gee`
+- `/pow/davidrodt`
+- `/pow/slater-jay`
+- `/pow/fiatjaf.com`
+- `/pow/dergigi.com`
+- `/pow/suhailsaqan`
+- `/pow/greenart7c3`
+- `/pow/johngribbin`
+- `/pow/DanConwayDev`
+- `/pow/LibertyFarmer`
+- `/pow/danconwaydev.com`
+- `/pow/dergigi?year=2025`
+- `/pow/fiatjaf.com?gh=fiatjaf`
+- `/pow/Kukks?p=kukks@kukks.org`
+- `/pow?repo=OpenSats%2Fwebsite`
+- `/pow/jackjack?p=jack@primal.net`
+- `/pow/npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z`
+- `/pow/npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft`
+- `/pow/callebtc?p=npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg`
+- `/pow/npub1n3w4uts2r4srq3adqu9trp953dflcnw7ppn72tad4htkpsckwcmqjef6um?gh=BoltTouring`
+- `/pow/DanConwayDev?p=npub15qydau2hjma6ngxkl2cyar74wzyjshvl65za5k5rl69264ar2exs5cyejr`
