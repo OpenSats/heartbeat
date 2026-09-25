@@ -1,5 +1,6 @@
 import { nip19, type Filter } from 'nostr-tools';
 import { parseGrasp } from './ngit.js';
+import { nip05Address } from './nip05.js';
 
 export type Source = {
   key: string;
@@ -122,9 +123,14 @@ export function parseSource(kind: string, input: string): Source {
   throw new Error('Unknown source type.');
 }
 
-export function sourcesFromUrl(params: URLSearchParams) {
+export type IdentityResolution = { npub?: string; error?: string };
+export function sourcesFromUrl(
+  params: URLSearchParams,
+  resolutions: Record<string, IdentityResolution> = {},
+) {
   const sources = new Map<string, Source>();
   const errors: string[] = [];
+  const pending = new Set<string>();
   for (const [parameter, kind] of [
     ['p', 'nostr'],
     ['gh', 'github'],
@@ -133,10 +139,21 @@ export function sourcesFromUrl(params: URLSearchParams) {
   ]) {
     for (const input of params.getAll(parameter).filter(Boolean)) {
       try {
-        const source = parseSource(kind, input);
+        let resolved = input;
+        if (['nostr', 'ngit'].includes(kind) && !/^(nostr:)?npub1/i.test(input.trim())) {
+          const { address } = nip05Address(input);
+          const resolution = resolutions[address];
+          if (resolution?.error) throw new Error(resolution.error);
+          if (!resolution?.npub) {
+            pending.add(address);
+            continue;
+          }
+          resolved = resolution.npub;
+        }
+        const source = parseSource(kind, resolved);
         sources.set(source.key, source);
         if (kind === 'nostr') {
-          const code = parseSource('ngit', input);
+          const code = parseSource('ngit', resolved);
           sources.set(code.key, code);
         }
       } catch (error) {
@@ -145,7 +162,7 @@ export function sourcesFromUrl(params: URLSearchParams) {
     }
   }
   if (sources.size > 8) errors.push('Showing the first 8 sources.');
-  return { sources: [...sources.values()].slice(0, 8), errors };
+  return { sources: [...sources.values()].slice(0, 8), errors, pending: [...pending].slice(0, 8) };
 }
 
 export function hasPending(snapshot: Snapshot | null | undefined) {
