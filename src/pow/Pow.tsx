@@ -494,19 +494,19 @@ export function Pow() {
         className="sm:sticky sm:top-0 z-10 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur px-3 py-2 space-y-2"
       >
         <div className="flex items-center justify-between gap-3">
-          <a
-            href="/"
-            className="flex items-center gap-1.5"
-            title="heartbeat"
-            aria-label="heartbeat/pow"
-          >
-            <img
-              src={`${import.meta.env.BASE_URL}opensats-mark.svg`}
-              alt=""
-              className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]"
-            />
-            <h1 className="text-zinc-100 text-base font-medium">heartbeat/pow</h1>
-          </a>
+          <h1 className="flex items-center text-zinc-100 text-base font-medium">
+            <a href="/" className="flex items-center gap-1.5" title="heartbeat">
+              <img
+                src={`${import.meta.env.BASE_URL}opensats-mark.svg`}
+                alt=""
+                className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]"
+              />
+              <span>heartbeat</span>
+            </a>
+            <a href="/pow" title="PoW landing page">
+              /pow
+            </a>
+          </h1>
           <div className="flex items-center gap-3">
             <button
               className="p-1 text-zinc-500 hover:text-zinc-300"
