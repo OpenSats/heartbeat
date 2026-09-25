@@ -3,6 +3,7 @@ import { nip19, verifyEvent, type Event } from 'nostr-tools';
 import { relayUrl } from '../src/pow/ngit.js';
 import type { RelayTask, Snapshot, Source } from '../src/pow/model.js';
 import { queryRelay } from './relay.js';
+import { recordRelayFetches } from './relay-provenance.js';
 
 const FALLBACK = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
 const DISCOVERY = [
@@ -134,6 +135,7 @@ export async function collectNostr(
   return {
     events: [...events.values()],
     pendingRelays,
+    relayFetches: recordRelayFetches(previous?.relayFetches ?? [], tasks, results),
     relayIncomplete: incomplete,
     profileUrl: `https://njump.to/${source.label}`,
     coverage: `${month}: signed text notes from NIP-65 write relays and fallback relays, with up to eight advertised write relays per author. Relays can omit history; empty days cannot confirm inactivity. Notes with event references are labeled replies.`,

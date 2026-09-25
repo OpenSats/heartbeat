@@ -9,6 +9,7 @@ import {
 } from '../src/pow/ngit.js';
 import type { Activity, Source, Snapshot, RelayTask } from '../src/pow/model.js';
 import { queryRelay } from './relay.js';
+import { recordRelayFetches } from './relay-provenance.js';
 
 const BOOTSTRAP = ['wss://relay.ngit.dev', 'wss://nos.lol', 'wss://relay.damus.io'];
 const tag = (event: Event, name: string) => event.tags.find((t) => t[0] === name)?.[1];
@@ -160,6 +161,7 @@ export async function collectNgit(
   return {
     events: [...events.values()],
     pendingRelays,
+    relayFetches: recordRelayFetches(previous?.relayFetches ?? [], tasks, results),
     relayIncomplete: incomplete,
     profileUrl: pointer ? `https://njump.to/${source.value}` : `https://njump.to/${source.label}`,
     coverage: `${month}: signed NIP-34 patches, PRs, issues, status messages, comments and repository updates.${pointer ? ' Repository context includes all contributors; comments and status events without a repository tag may be missing.' : ''} Ref updates are not individual commits. Relays can omit history and replace older repository state.`,

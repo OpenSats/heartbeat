@@ -41,7 +41,22 @@ export type GithubThreadTask = {
   endpoint: 'timeline' | 'reviews' | 'review-comments';
   page: number;
 };
+export type RelayFetch = {
+  url: string;
+  checkedAt: string;
+  status: 'complete' | 'partial' | 'unavailable';
+  eventCount: number;
+};
+export function latestRelayFetches(fetches: RelayFetch[]): RelayFetch[] {
+  const latest = new Map<string, RelayFetch>();
+  for (const fetch of fetches) {
+    if (!latest.has(fetch.url) || latest.get(fetch.url)!.checkedAt <= fetch.checkedAt)
+      latest.set(fetch.url, fetch);
+  }
+  return [...latest.values()].sort((a, b) => a.url.localeCompare(b.url));
+}
 export type Snapshot = {
+  relayFetches?: RelayFetch[];
   githubVersion?: number;
   pendingGithub?: GithubThreadTask[];
   githubThreads?: string[];

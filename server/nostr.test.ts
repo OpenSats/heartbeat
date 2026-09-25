@@ -47,6 +47,8 @@ test('month collection resumes relay cursors and retains observations when relay
     query: async () => ({ events: [note], exhaustive: false, nextUntil: note.created_at }),
   });
   assert.equal(first.windows?.[0].exhaustive, false);
+  assert.equal(first.relayFetches?.[0].status, 'partial');
+  assert.equal(first.relayFetches?.[0].eventCount, 1);
   assert.equal(first.pendingRelays?.[0].until, note.created_at);
   const second = await collectNostr(source, '2025-01', first, bounds, {
     discover,
@@ -57,6 +59,7 @@ test('month collection resumes relay cursors and retains observations when relay
   });
   assert.equal(discoveries, 1);
   assert.equal(second.events.length, 1);
+  assert.equal(second.relayFetches?.[0].status, 'complete');
   assert.equal(second.windows?.[0].exhaustive, true);
   const refreshed = await collectNostr(source, '2025-01', second, bounds, {
     discover,
@@ -77,5 +80,6 @@ test('unavailable relays get bounded retries and leave coverage incomplete', asy
     snapshot = await collectNostr(source, '2025-01', snapshot, bounds, dependencies);
   assert.deepEqual(snapshot.pendingRelays, []);
   assert.equal(snapshot.relayIncomplete, true);
+  assert.equal(snapshot.relayFetches?.[0].status, 'unavailable');
   assert.equal(snapshot.windows?.[0].exhaustive, false);
 });
