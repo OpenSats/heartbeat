@@ -212,6 +212,7 @@ function Heatmap({
   filteredView,
   dates,
   sourceDates = [],
+  platforms = [],
   selected,
   onSelect,
   loading,
@@ -222,6 +223,7 @@ function Heatmap({
   filteredView: boolean;
   dates: string[];
   sourceDates?: { date: string; platform: HeatmapPlatform }[];
+  platforms?: readonly HeatmapPlatform[];
   selected: string;
   onSelect: (day: string) => void;
   loading: boolean;
@@ -250,6 +252,22 @@ function Heatmap({
   const days = Math.round((end - start) / 86400000) + 1;
   const oldest = new Date(start).toISOString().slice(0, 10);
   const total = dates.filter((date) => date >= oldest && date <= today).length;
+  const eventLabels = {
+    github: 'GitHub events',
+    nostr: 'Nostr posts and replies',
+    ngit: 'ngit / GRASP events',
+  };
+  const caption =
+    platform === 'combined'
+      ? new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(
+          platforms.map((source) => {
+            const count = sourceDates.filter(
+              ({ date, platform }) => platform === source && date >= oldest && date <= today,
+            ).length;
+            return `${count.toLocaleString()} ${filteredView ? 'matching ' : ''}${eventLabels[source]}`;
+          }),
+        ) || '0 events'
+      : `${total.toLocaleString()} ${filteredView ? 'matching ' : ''}${eventLabels[platform]}`;
   const offset = new Date(start).getUTCDay();
   const cells = Array.from({ length: Math.ceil((days + offset) / 7) * 7 }, (_, i) => {
     const time = start + (i - offset) * 86400000;
@@ -269,15 +287,7 @@ function Heatmap({
                   : 'text-violet-400'
           }
         >
-          {total.toLocaleString()} {filteredView ? 'matching ' : ''}
-          {platform === 'combined'
-            ? 'events across selected sources'
-            : platform === 'github'
-              ? 'GitHub events'
-              : platform === 'ngit'
-                ? 'ngit / GRASP events'
-                : 'Nostr posts and replies'}{' '}
-          {year === null ? 'in the last year' : `in ${year}`}
+          {caption} {year === null ? 'in the last year' : `in ${year}`}
         </span>
         {loading && <span className="text-zinc-600">backfilling...</span>}
         {selected && (
@@ -815,6 +825,7 @@ export function Pow() {
               <Heatmap
                 year={year}
                 platform="combined"
+                platforms={heatmapPlatforms}
                 filteredView={kind !== 'all' || !!query || !!actor || !!repo}
                 dates={filtered.map(({ event }) => event.timestamp.slice(0, 10))}
                 sourceDates={filtered.map(({ event, source }) => ({
