@@ -120,7 +120,8 @@ Thread pages are cached independently for 24 hours by repository, issue/PR,
 endpoint, and page, and reused across people and months. GitHub monthly snapshots
 use `v4` keys; existing `v3` activity remains visible as incomplete while the new
 collector backfills. Older preview deployments cannot overwrite these expanded
-snapshots. Nostr/ngit cache keys remain unchanged. No database migration is needed.
+snapshots. Nostr also uses `v4` keys for outbox backfills; ngit keys remain unchanged.
+No database migration is needed.
 
 Cross-repository discovery is not exhaustive: searches can miss threads where
 someone only changed a status, and deleted or inaccessible content is unavailable.
@@ -128,8 +129,24 @@ Person heatmaps therefore retain uncertain coverage even after all discovered
 pages have been fetched. This uncertainty does not trigger perpetual historical
 backfills: completed historical collection checkpoints remain cached indefinitely.
 Extra GitHub repos include all contributors. Other git hosts are not supported.
-Nostr paginates signed kind-1 notes across three fixed relays. Its relay coverage
-can never prove inactivity. All Nostr days, person-level GitHub discovery, unfetched periods, and incomplete
+Nostr discovers the author's latest signed NIP-65 (kind 10002) relay list and
+reads kind-1 notes from its write relays (including entries marked for both read
+and write). These are the relays where the author publishes; read-only entries
+are for receiving mentions. Up to eight advertised write relays are queried,
+plus `relay.damus.io`, `nos.lol`, and `relay.primal.net` as fallbacks.
+Discovery queries those three plus `purplepag.es`, `relay.nostr.com`,
+`nostr.bitcoiner.social`, `nostr.mom`, `relay.snort.social`, `nos.relay`,
+`nostr.inosta.cc`, and `nostr.wine`. Discovery is cached per pubkey for 24 hours;
+failed discovery is retried after an hour. A cached signed list survives discovery
+outages, while a newer empty list clears its advertised relays. NIP-66 health
+reports are not used yet.
+
+Monthly pagination resumes through the queue, with bounded retries for failing
+relays. Previously observed posts are retained. Existing v3 months stay visible
+while requested history is supplemented using outbox relays. Completed historical
+months remain cached indefinitely; later relay-list changes do not automatically
+reopen them. Partial months retry after an hour. Only public WSS relays on port
+443 are supported. Relay coverage can never prove inactivity. All Nostr days, person-level GitHub discovery, unfetched periods, and incomplete
 GitHub repository periods are striped in the heatmap. Plain empty repository cells
 mean no indexed activity in the fetched GitHub categories. Today remains uncertain until complete.
 Click a day to filter the timeline. The source form is hidden when URL parameters

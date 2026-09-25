@@ -96,7 +96,7 @@ function SourceStatus({
               events: [...activities.values()],
               windows,
               profileUrl: snapshots[0].profileUrl.replace('https://njump.me/', 'https://njump.to/'),
-              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from public relays. Relays can omit history, so empty days remain uncertain.' : sourcePlatform(source) === 'ngit' ? 'Signed patches, PRs, issues, code comments, status messages and repository updates. Ref updates are not individual commits. Relays may omit history or replace older state.' : 'Public commits, issues, PRs, comments, reviews and status changes. Cross-repository discovery and GitHub indexing can omit activity.'}${isRepository(source) ? ' Repository context includes all contributors.' : ''}${source.kind === 'grasp' ? ' Comments and status messages without repository tags may be missing.' : ''}`,
+              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from the author’s NIP-65 write relays and public fallback relays. Relays can omit history, so empty days remain uncertain.' : sourcePlatform(source) === 'ngit' ? 'Signed patches, PRs, issues, code comments, status messages and repository updates. Ref updates are not individual commits. Relays may omit history or replace older state.' : 'Public commits, issues, PRs, comments, reviews and status changes. Cross-repository discovery and GitHub indexing can omit activity.'}${isRepository(source) ? ' Repository context includes all contributors.' : ''}${source.kind === 'grasp' ? ' Comments and status messages without repository tags may be missing.' : ''}`,
             }
           : null,
         fetchedAt:
