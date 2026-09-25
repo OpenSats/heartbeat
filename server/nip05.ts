@@ -60,3 +60,28 @@ export async function resolveNip05(input: string) {
     throw new Error(`No valid Nostr public key was found for ${address}.`);
   return { address, npub: nip19.npubEncode(pubkey) };
 }
+
+// Use the latest signed profile observed, then require the domain to point back to this key.
+export async function verifiedNip05(npub: string) {
+  const { queryRelay } = await import('./relay.js');
+  const decoded = nip19.decode(npub);
+  if (decoded.type !== 'npub') throw new Error('Enter an npub.');
+  const results = await Promise.allSettled(
+    ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net'].map((url) =>
+      queryRelay(url, [{ authors: [decoded.data], kinds: [0] }], { once: true, timeout: 5000 }),
+    ),
+  );
+  const profile = results
+    .flatMap((r) => (r.status === 'fulfilled' ? r.value.events : []))
+    .sort((a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id))[0];
+  if (!profile) return null;
+  try {
+    const claim = JSON.parse(profile.content).nip05;
+    if (typeof claim !== 'string') return null;
+    const resolved = await resolveNip05(claim);
+    if (resolved.npub !== nip19.npubEncode(decoded.data)) return null;
+    return resolved.address.startsWith('_@') ? resolved.address.slice(2) : resolved.address;
+  } catch {
+    return null;
+  }
+}
