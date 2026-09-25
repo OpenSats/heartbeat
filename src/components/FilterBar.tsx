@@ -23,6 +23,7 @@ type Props = {
   repoFilter: FilterControl;
   typeFilter: FilterControl;
   actorFilter: FilterControl;
+  actorPowHref?: string;
 };
 
 const clearIfActive = (f: FilterControl) => (f.selected != null ? f.clear : undefined);
@@ -84,6 +85,7 @@ export function FilterBar({
   repoFilter,
   typeFilter,
   actorFilter,
+  actorPowHref,
 }: Props) {
   const selectedActors = actorFilter.selected;
   const [repoQuery, setRepoQuery] = useUrlString('q');
@@ -258,6 +260,15 @@ export function FilterBar({
               {a}
             </Chip>
           ))}
+          {actorPowHref && (
+            <a
+              href={actorPowHref}
+              className={chipClass(false)}
+              title="View this developer's PoW activity"
+            >
+              pow →
+            </a>
+          )}
         </ChipRow>
       )}
     </div>

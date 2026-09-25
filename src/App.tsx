@@ -97,6 +97,15 @@ export function App() {
     return <div className="p-6 text-zinc-500">loading...</div>;
   }
 
+  const selectedActor = actorFilter.selected?.size === 1 ? [...actorFilter.selected][0] : undefined;
+  const actorPowHref =
+    selectedActor &&
+    data.events.some(
+      (event) => event.actor === selectedActor && event.url.startsWith('https://github.com/'),
+    )
+      ? githubPowPath(selectedActor)
+      : undefined;
+
   const generated = new Date(data.generatedAt);
   const generatedLabel = isNaN(generated.getTime())
     ? 'never'
@@ -129,6 +138,7 @@ export function App() {
           repoFilter={repoFilter}
           typeFilter={typeFilter}
           actorFilter={actorFilter}
+          actorPowHref={actorPowHref}
         />
       </div>
       <Timeline
