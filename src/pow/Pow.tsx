@@ -189,7 +189,7 @@ function Heatmap({
   coverage,
 }: {
   year: number | null;
-  platform: 'github' | 'nostr' | 'ngit';
+  platform: 'github' | 'nostr' | 'ngit' | 'combined';
   filteredView: boolean;
   dates: string[];
   selected: string;
@@ -198,11 +198,13 @@ function Heatmap({
   coverage: (day: string) => boolean;
 }) {
   const heatColors =
-    platform === 'github'
-      ? ['bg-zinc-900', 'bg-emerald-950', 'bg-emerald-800', 'bg-emerald-600', 'bg-emerald-400']
-      : platform === 'ngit'
-        ? ['bg-zinc-900', 'bg-amber-950', 'bg-amber-800', 'bg-amber-600', 'bg-amber-400']
-        : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
+    platform === 'combined'
+      ? ['bg-zinc-900', 'bg-sky-950', 'bg-sky-800', 'bg-sky-600', 'bg-sky-400']
+      : platform === 'github'
+        ? ['bg-zinc-900', 'bg-emerald-950', 'bg-emerald-800', 'bg-emerald-600', 'bg-emerald-400']
+        : platform === 'ngit'
+          ? ['bg-zinc-900', 'bg-amber-950', 'bg-amber-800', 'bg-amber-600', 'bg-amber-400']
+          : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
   const counts = new Map<string, number>();
   for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
   const range = activityRange(year);
@@ -222,19 +224,23 @@ function Heatmap({
       <div className="mb-2 flex items-center gap-3">
         <span
           className={
-            platform === 'github'
-              ? 'text-emerald-400'
-              : platform === 'ngit'
-                ? 'text-amber-400'
-                : 'text-violet-400'
+            platform === 'combined'
+              ? 'text-sky-400'
+              : platform === 'github'
+                ? 'text-emerald-400'
+                : platform === 'ngit'
+                  ? 'text-amber-400'
+                  : 'text-violet-400'
           }
         >
           {total.toLocaleString()} {filteredView ? 'matching ' : ''}
-          {platform === 'github'
-            ? 'GitHub events'
-            : platform === 'ngit'
-              ? 'ngit / GRASP events'
-              : 'Nostr posts and replies'}{' '}
+          {platform === 'combined'
+            ? 'events across selected sources'
+            : platform === 'github'
+              ? 'GitHub events'
+              : platform === 'ngit'
+                ? 'ngit / GRASP events'
+                : 'Nostr posts and replies'}{' '}
           {year === null ? 'in the last year' : `in ${year}`}
         </span>
         {loading && <span className="text-zinc-600">backfilling...</span>}
@@ -307,9 +313,11 @@ function Heatmap({
         </div>
       </div>
       <p className="text-[10px] text-zinc-600 mt-2">
-        {platform === 'github'
-          ? 'Striped cells are incomplete. Plain empty cells have no fetched GitHub events matching the current filters.'
-          : 'Striped cells reflect uncertain relay coverage. An empty day does not confirm inactivity.'}
+        {platform === 'combined'
+          ? 'Striped cells mean at least one selected source has incomplete or uncertain coverage. An empty day does not confirm inactivity.'
+          : platform === 'github'
+            ? 'Striped cells are incomplete. Plain empty cells have no fetched GitHub events matching the current filters.'
+            : 'Striped cells reflect uncertain relay coverage. An empty day does not confirm inactivity.'}
       </p>
     </div>
   );
@@ -334,6 +342,7 @@ export function Pow() {
   const [repo, setRepo] = useState('');
   const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
+  const [combinedHeatmap, setCombinedHeatmap] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const { sources, errors } = useMemo(() => sourcesFromUrl(params), [params]);
   const onResult = useMemo(
@@ -450,6 +459,19 @@ export function Pow() {
       )
     );
   };
+  const heatmapPlatforms = (['github', 'nostr', 'ngit'] as const).filter(
+    (platform) =>
+      sources.some(
+        (source) => sourcePlatform(source) === platform && matchesSource(source, filter),
+      ) &&
+      (kind === 'all' ||
+        events.some(
+          ({ event, source }) => sourcePlatform(source) === platform && event.type === kind,
+        )),
+  );
+  const heatmapSources = sources.filter(
+    (source) => matchesSource(source, filter) && heatmapPlatforms.includes(sourcePlatform(source)),
+  );
   const activeDays = new Set(filtered.map(({ event }) => event.timestamp.slice(0, 10))).size;
   const repoCount = new Set(filtered.map(({ event }) => event.repo).filter(Boolean)).size;
   function selectYear(value: number | null) {
@@ -685,39 +707,68 @@ export function Pow() {
       </div>
       {!!sources.length && (
         <div className="w-full">
+          <div
+            className="flex items-center gap-1.5 px-3 py-2 border-b border-zinc-900"
+            role="group"
+            aria-label="Heatmap layout"
+          >
+            <span className="text-zinc-600 text-xs">heatmap:</span>
+            {(['separate', 'combined'] as const).map((layout) => (
+              <button
+                key={layout}
+                className={chipClass(combinedHeatmap === (layout === 'combined'))}
+                aria-pressed={combinedHeatmap === (layout === 'combined')}
+                onClick={() => setCombinedHeatmap(layout === 'combined')}
+              >
+                {layout}
+              </button>
+            ))}
+          </div>
           <div className="min-w-0 flex-1 w-full">
-            {(['github', 'nostr', 'ngit'] as const).map((platform) => {
-              const platformSources = sources.filter(
-                (source) => sourcePlatform(source) === platform && matchesSource(source, filter),
-              );
-              if (!platformSources.length) return null;
-              if (
-                kind !== 'all' &&
-                !events.some(
-                  ({ event, source }) => sourcePlatform(source) === platform && event.type === kind,
-                )
-              )
-                return null;
-              const activity = filtered.filter(({ source }) => sourcePlatform(source) === platform);
-              return (
-                <Heatmap
-                  key={platform}
-                  year={year}
-                  platform={platform}
-                  filteredView={kind !== 'all' || !!query || !!actor || !!repo}
-                  dates={activity.map(({ event }) => event.timestamp.slice(0, 10))}
-                  selected={filter === platform || filter === 'repo' ? day : ''}
-                  onSelect={(date) => {
-                    setDay(date);
-                    if (date && filter !== 'repo') setFilter(platform);
-                  }}
-                  loading={platformSources.some(
-                    (source) => !results[source.key] || results[source.key].refreshing,
-                  )}
-                  coverage={(date) => coverage(date, platform)}
-                />
-              );
-            })}
+            {combinedHeatmap ? (
+              <Heatmap
+                year={year}
+                platform="combined"
+                filteredView={kind !== 'all' || !!query || !!actor || !!repo}
+                dates={filtered.map(({ event }) => event.timestamp.slice(0, 10))}
+                selected={day}
+                onSelect={setDay}
+                loading={heatmapSources.some(
+                  (source) => !results[source.key] || results[source.key].refreshing,
+                )}
+                coverage={(date) =>
+                  heatmapPlatforms.length > 0 &&
+                  heatmapPlatforms.every((platform) => coverage(date, platform))
+                }
+              />
+            ) : (
+              heatmapPlatforms.map((platform) => {
+                const platformSources = sources.filter(
+                  (source) => sourcePlatform(source) === platform && matchesSource(source, filter),
+                );
+                const activity = filtered.filter(
+                  ({ source }) => sourcePlatform(source) === platform,
+                );
+                return (
+                  <Heatmap
+                    key={platform}
+                    year={year}
+                    platform={platform}
+                    filteredView={kind !== 'all' || !!query || !!actor || !!repo}
+                    dates={activity.map(({ event }) => event.timestamp.slice(0, 10))}
+                    selected={filter === platform || filter === 'repo' ? day : ''}
+                    onSelect={(date) => {
+                      setDay(date);
+                      if (date && filter !== 'repo') setFilter(platform);
+                    }}
+                    loading={platformSources.some(
+                      (source) => !results[source.key] || results[source.key].refreshing,
+                    )}
+                    coverage={(date) => coverage(date, platform)}
+                  />
+                );
+              })
+            )}
           </div>
         </div>
       )}
