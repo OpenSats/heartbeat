@@ -18,7 +18,11 @@ The browser resolves each address independently through `/api/pow/resolve`, then
 loads activity under the resulting npub. Human-readable addresses stay in the
 page URL. Successful public lookups are cached at the CDN for one hour and in
 the browser HTTP cache for five minutes; no identity directory is stored in the
-database. Lookups use HTTPS, reject redirects, and allow only public IP addresses.
+database. Lookups use HTTPS, reject redirects, and allow only public IP addresses. Source
+labels and matching timeline authors use the NIP-05 identifier from the latest
+observed signed profile only after its domain resolves back to the same npub.
+Root identifiers display as bare domains. Failed or mismatched checks keep the
+npub visible; filtering and activity cache keys continue to use the original key.
 
 An `npub` in `p=` loads both text notes and ngit activity. Use `ngit=npub…`
 to load code activity alone. NIP-34 patches, PRs, PR updates, issues, NIP-22 code
