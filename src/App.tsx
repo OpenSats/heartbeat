@@ -58,9 +58,12 @@ export function App() {
       .map((event) => ({
         ...event,
         // Handles from other Git hosts need their own identity support in PoW.
-        actorHref: event.url.startsWith('https://github.com/')
-          ? githubPowPath(event.actor)
-          : undefined,
+        actorHref:
+          actorFilter.selected?.size === 1 &&
+          actorFilter.selected.has(event.actor) &&
+          event.url.startsWith('https://github.com/')
+            ? githubPowPath(event.actor)
+            : undefined,
       }));
   }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
 
