@@ -1014,8 +1014,8 @@ export function Pow() {
       ) : !sources.length ? (
         <div className="text-zinc-500 px-2 py-8 text-sm">
           Enter a GitHub handle, npub, or NIP-05 address to load activity.{' '}
-          <a href="/pow/dergigi" className="text-zinc-400">
-            Try dergigi
+          <a href="/pow/fiatjaf" className="text-zinc-400">
+            Try fiatjaf
           </a>
           .
         </div>
