@@ -14,9 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (
       typeof kind !== 'string' ||
       typeof value !== 'string' ||
-      Object.keys(req.query).some((k) => !['kind', 'value'].includes(k))
+      Object.keys(req.query).some((k) => !['kind', 'value', 'v'].includes(k))
     )
       throw new Error('Supply one source.');
+    if (req.query.v !== undefined && req.query.v !== '2') throw new Error('Invalid version.');
     if (kind === 'github' || kind === 'nostr') parseSource(kind, value);
     else if (kind !== 'gist' || !/^[a-f0-9]{1,64}$/i.test(value))
       throw new Error('Invalid source.');

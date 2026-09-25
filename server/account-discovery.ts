@@ -54,6 +54,7 @@ export async function accountEvidence(kind: string, value: string) {
       .sort((a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id));
     // A newer empty NIP-39 list must supersede legacy kind-0 claims.
     return {
+      profile: events.find((e) => e.kind === 0) ?? null,
       event: events.find((e) => e.kind === 10011) ?? events.find((e) => e.kind === 0) ?? null,
     };
   }
