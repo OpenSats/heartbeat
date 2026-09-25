@@ -24,24 +24,31 @@
           "retryAfterSeconds": 60
         }
       ]
+    },
+    "api/pow/page.ts": {
+      "includeFiles": "dist/index.html"
+    },
+    "api/pow/og.ts": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff"
     }
   },
   "rewrites": [
     {
       "source": "/pow",
-      "destination": "/index.html"
+      "destination": "/api/pow/page"
     },
     {
       "source": "/pow/",
-      "destination": "/index.html"
+      "destination": "/api/pow/page"
     },
     {
       "source": "/pow/:person",
-      "destination": "/index.html"
+      "destination": "/api/pow/page?person=:person"
     },
     {
       "source": "/pow/:person/",
-      "destination": "/index.html"
+      "destination": "/api/pow/page?person=:person"
     }
   ],
   "headers": [
