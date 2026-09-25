@@ -7,6 +7,19 @@ GitHub; domains and NIP-05 identifiers resolve to Nostr. Existing `/pow?gh=dergi
 links and `p=npub…` or repeated `repo=owner/repo` parameters also work. The browser combines sources; the backend accepts exactly one source
 per request. No person registry, identity mappings, or combined reports are stored.
 
+Social previews use `@vercel/og` at `/api/pow/og`, with the same source parameters
+and optional `year`. Person pages serve Open Graph and Twitter card metadata in
+the initial HTML while keeping the existing React app. The card combines cached
+activity with per-source counts, an avatar, and coverage markings. It never
+starts activity backfills. Profile discovery uses the existing independent CDN
+caches, has a 12-second budget, and shares the page's verification rules.
+Rendered images are CDN-cached for one hour, or one minute when source months
+are missing or unavailable. Social platforms may retain their own copies longer.
+No new database tables, stored account associations, or Blob storage are needed.
+Avatars use bounded HTTPS downloads with public DNS pinning; unavailable images
+fall back to an initial. `/pow` previews always show the combined activity for
+the URL's sources and year; temporary browser-only filters are not included.
+
 `/api/pow/source?kind=github&value=dergigi` uses a Neon Postgres source cache.
 Set server-only `DATABASE_URL` and `GITHUB_TOKEN`; run `npm run db:migrate` once
 against that database. For local setup using pulled Vercel variables:
