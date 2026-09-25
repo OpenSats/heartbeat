@@ -19,13 +19,16 @@ async function github<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-// Return public source documents. Matching accounts happens only in the browser.
+// Return independent public source documents; never persist account associations.
 export async function accountEvidence(kind: string, value: string) {
   if (kind === 'github') {
     const source = parseSource('github', value);
-    const profile = await github<{ login: string; bio: string | null; blog: string | null }>(
-      `/users/${source.value}`,
-    );
+    const profile = await github<{
+      login: string;
+      bio: string | null;
+      blog: string | null;
+      avatar_url: string;
+    }>(`/users/${source.value}`);
     let social: { url: string }[] = [];
     try {
       social = await github(`/users/${source.value}/social_accounts`);
@@ -34,6 +37,7 @@ export async function accountEvidence(kind: string, value: string) {
     }
     return {
       login: profile.login,
+      avatar: profile.avatar_url,
       bio: profile.bio,
       blog: profile.blog,
       social: social.map(({ url }) => url).slice(0, 20),
