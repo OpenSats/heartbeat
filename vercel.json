@@ -1,0 +1,70 @@
+{
+  "functions": {
+    "api/pow/source.ts": {
+      "maxDuration": 60
+    },
+    "api/pow/github-worker.ts": {
+      "maxDuration": 60,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "pow-github",
+          "maxConcurrency": 1,
+          "retryAfterSeconds": 60
+        }
+      ]
+    },
+    "api/pow/nostr-worker.ts": {
+      "maxDuration": 60,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "pow-nostr",
+          "maxConcurrency": 2,
+          "retryAfterSeconds": 60
+        }
+      ]
+    },
+    "api/pow/page.ts": {
+      "includeFiles": "dist/index.html"
+    },
+    "api/pow/og.ts": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/pow",
+      "destination": "/api/pow/page"
+    },
+    {
+      "source": "/pow/",
+      "destination": "/api/pow/page"
+    },
+    {
+      "source": "/pow/:person",
+      "destination": "/api/pow/page?person=:person"
+    },
+    {
+      "source": "/pow/:person/",
+      "destination": "/api/pow/page?person=:person"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/pow/:path*",
+      "headers": [
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
+  "buildCommand": "npm run build:vercel"
+}

@@ -1,10 +1,17 @@
 import { memo } from 'react';
-import type { Event } from '../types';
-import { EVENT_TYPE_META } from '../eventTypes';
+import type { Event, EventType } from '../types';
+import { EVENT_TYPE_META, type EventTypeMeta } from '../eventTypes';
 import { displayRepo, RepoLabel } from './RepoLabel';
 
+export type TimelineEvent = Omit<Event, 'type'> & {
+  type: string;
+  meta?: EventTypeMeta;
+  actorLabel?: string;
+  actorHref?: string;
+};
+
 type Props = {
-  event: Event;
+  event: TimelineEvent;
   onSelectRepo?: (repo: string) => void;
   onSelectActor?: (actor: string) => void;
 };
@@ -24,6 +31,9 @@ function FilterButton({
   title?: string;
   children: React.ReactNode;
 }) {
+  if (!onSelect) {
+    return <span className={`truncate text-left ${className}`}>{children}</span>;
+  }
   return (
     <button
       type="button"
@@ -39,7 +49,7 @@ function FilterButton({
 export const EventRow = memo(EventRowImpl);
 
 function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
-  const meta = EVENT_TYPE_META[event.type];
+  const meta = event.meta ?? EVENT_TYPE_META[event.type as EventType];
   const time = event.timestamp.slice(11, 16);
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 py-1 sm:py-0.5 px-2 text-sm leading-6 hover:bg-zinc-900/60">
@@ -64,13 +74,23 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       >
         <RepoLabel repo={event.repo} />
       </FilterButton>
-      <FilterButton
-        value={event.actor}
-        onSelect={onSelectActor}
-        className="text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
-      >
-        {event.actor}
-      </FilterButton>
+      {event.actorHref ? (
+        <a
+          href={event.actorHref}
+          title={`View ${event.actorLabel ?? event.actor}'s activity`}
+          className="transition-colors truncate text-left text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
+        >
+          {event.actorLabel ?? event.actor}
+        </a>
+      ) : (
+        <FilterButton
+          value={event.actor}
+          onSelect={onSelectActor}
+          className="text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
+        >
+          {event.actorLabel ?? event.actor}
+        </FilterButton>
+      )}
       <a
         href={event.url}
         target="_blank"
