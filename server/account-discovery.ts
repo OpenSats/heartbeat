@@ -2,7 +2,7 @@ import { parseSource } from '../src/pow/model.js';
 import { queryRelay } from './relay.js';
 import { githubSlot, githubCooldown } from './rate-limit.js';
 
-async function github(path: string) {
+async function github<T>(path: string): Promise<T> {
   await githubSlot('core');
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
@@ -16,14 +16,16 @@ async function github(path: string) {
     throw await githubCooldown('core', response);
   if (!response.ok) throw new Error('GitHub source unavailable.');
   if (response.headers.get('x-ratelimit-remaining') === '0') await githubCooldown('core', response);
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 // Return public source documents. Matching accounts happens only in the browser.
 export async function accountEvidence(kind: string, value: string) {
   if (kind === 'github') {
     const source = parseSource('github', value);
-    const profile = await github(`/users/${source.value}`);
+    const profile = await github<{ login: string; bio: string | null; blog: string | null }>(
+      `/users/${source.value}`,
+    );
     let social: { url: string }[] = [];
     try {
       social = await github(`/users/${source.value}/social_accounts`);
@@ -56,7 +58,11 @@ export async function accountEvidence(kind: string, value: string) {
     };
   }
   if (kind === 'gist' && /^[a-f0-9]{1,64}$/i.test(value)) {
-    const gist = await github(`/gists/${value}`);
+    const gist = await github<{
+      public: boolean;
+      owner?: { login: string };
+      files?: Record<string, { content?: string; truncated?: boolean }>;
+    }>(`/gists/${value}`);
     if (!gist.public) throw new Error('Only public proofs are supported.');
     const files = Object.values(gist.files ?? {}) as { content?: string; truncated?: boolean }[];
     return {
