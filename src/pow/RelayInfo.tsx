@@ -54,7 +54,6 @@ export function RelayInfo({
       </summary>
       <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-7rem)] rounded border border-zinc-800 bg-zinc-950 p-3 shadow-xl text-xs">
         <h2 className="text-zinc-200">Cached relay fetches</h2>
-        <p className="mt-1 text-zinc-500">Last recorded fetch per relay for this period.</p>
         <ul className="mt-3 space-y-3 max-h-72 overflow-y-auto">
           {fetches.map((fetch) => {
             const status = fetch.status === 'complete' ? 'fetched' : fetch.status;
