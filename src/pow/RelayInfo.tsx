@@ -60,15 +60,6 @@ export function RelayInfo({
         <p className="mt-1 text-zinc-500">Last recorded fetch per relay for this period.</p>
         <ul className="mt-3 space-y-3 max-h-72 overflow-y-auto">
           {fetches.map((fetch) => {
-            const platforms = [
-              ...new Set(
-                relaySources
-                  .filter((source) =>
-                    results[source.key]?.snapshot?.relayFetches?.some((r) => r.url === fetch.url),
-                  )
-                  .map(sourcePlatform),
-              ),
-            ];
             const status = fetch.status === 'complete' ? 'fetched' : fetch.status;
             return (
               <li key={fetch.url} title={fetch.url}>
@@ -82,7 +73,7 @@ export function RelayInfo({
                   </span>
                 </div>
                 <div className="ml-3.5 mt-0.5 text-zinc-500">
-                  {platforms.join(' · ')} · {status}
+                  {status}
                   {fetch.status !== 'unavailable' &&
                     ` · ${fetch.eventCount.toLocaleString()} events`}
                 </div>
