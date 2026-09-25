@@ -50,3 +50,41 @@ export function matchingGithubProof(
     proof.content?.trim() === `Verifying that I control the following Nostr public key: ${npub}`
   );
 }
+
+export function profileMetadata(event: Event | null, npub: string): Record<string, unknown> {
+  try {
+    const decoded = nip19.decode(npub);
+    if (
+      !event ||
+      event.kind !== 0 ||
+      decoded.type !== 'npub' ||
+      event.pubkey !== decoded.data ||
+      !verifyEvent(event)
+    )
+      return {};
+    const profile = JSON.parse(event.content);
+    return profile && typeof profile === 'object' && !Array.isArray(profile) ? profile : {};
+  } catch {
+    return {};
+  }
+}
+
+export function websiteDomain(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value.includes('://') ? value : `https://${value}`);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.port ||
+      url.search ||
+      url.hash ||
+      url.pathname !== '/'
+    )
+      return null;
+    return url.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
