@@ -37,6 +37,17 @@ const typeGroups: Record<string, string> = {
 const typeFilter = (type: string) =>
   type.startsWith('status: ') ? 'status changes' : (typeGroups[type] ?? type);
 
+const landingExamples = [
+  '/pow/dtonon',
+  '/pow/pablof7z',
+  '/pow/dergigi.com',
+  '/pow/suhailsaqan',
+  '/pow/Kukks?p=kukks@kukks.org',
+  '/pow/jackjack?p=jack@primal.net',
+  '/pow/danconwaydev.com?gh=danconwaydev',
+  '/pow?repo=OpenSats%2Fwebsite',
+];
+
 const currentYear = new Date().getUTCFullYear();
 const years = Array.from(
   { length: currentYear - FIRST_HISTORY_YEAR + 1 },
@@ -485,6 +496,7 @@ export function Pow() {
   const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
   const [combinedHeatmap, setCombinedHeatmap] = useState(true);
+  const [showExamples, setShowExamples] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const {
     sources,
@@ -1014,10 +1026,29 @@ export function Pow() {
       ) : !sources.length ? (
         <div className="text-zinc-500 px-2 py-8 text-sm">
           Enter a GitHub handle, npub, or NIP-05 address to load activity.{' '}
-          <a href="/pow/fiatjaf" className="text-zinc-400">
+          <a href="/pow/fiatjaf" className="text-zinc-400 hover:text-zinc-200">
             Try fiatjaf
           </a>
-          .
+          <button
+            type="button"
+            className={`${chipClass(showExamples)} ml-3`}
+            aria-expanded={showExamples}
+            aria-controls="pow-examples"
+            onClick={() => setShowExamples((shown) => !shown)}
+          >
+            {showExamples ? 'fewer examples' : 'more examples'}
+          </button>
+          {showExamples && (
+            <ul id="pow-examples" className="mt-3 space-y-1 text-xs">
+              {landingExamples.map((path) => (
+                <li key={path}>
+                  <a href={path} className="text-zinc-400 hover:text-zinc-200 break-all">
+                    {path}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : loading && !visible.length ? (
         <div className="text-zinc-500 px-2 py-8">loading...</div>
