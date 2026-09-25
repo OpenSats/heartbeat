@@ -651,7 +651,6 @@ export function Pow() {
             </a>
           </h1>
           <div className="flex items-center gap-3">
-            <RelayInfo sources={sources} results={results} />
             <button
               className="p-1 text-zinc-500 hover:text-zinc-300"
               aria-label={copied ? 'Link copied' : 'Copy link'}
@@ -686,6 +685,7 @@ export function Pow() {
                 )}
               </svg>
             </button>
+            <RelayInfo sources={sources} results={results} />
             <a
               href="https://opensats.org"
               target="_blank"
