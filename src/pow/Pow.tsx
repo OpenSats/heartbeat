@@ -410,7 +410,6 @@ export function Pow() {
   const [filter, setFilter] = useState('all');
   const [kind, setKind] = useState('all');
   const [query, setQuery] = useState('');
-  const [actor, setActor] = useState('');
   const [repo, setRepo] = useState('');
   const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
@@ -461,7 +460,6 @@ export function Pow() {
       setGh(next.getAll('gh').join(', '));
       setNpub(next.get('p') ?? '');
       setRepos(next.getAll('repo').join(', '));
-      setActor('');
       setRepo('');
       setDay('');
     };
@@ -489,7 +487,6 @@ export function Pow() {
   const filtered = events.filter(
     ({ event }) =>
       (kind === 'all' || event.type === kind) &&
-      (!actor || event.actor === actor) &&
       (!repo || event.repo === repo) &&
       `${event.title} ${event.repo ?? ''} ${event.actor} ${displayName(event.actor)}`
         .toLowerCase()
@@ -577,7 +574,6 @@ export function Pow() {
     setParams(next);
     setDay('');
     setKind('all');
-    setActor('');
     setRepo('');
     setQuery('');
   }
@@ -600,7 +596,6 @@ export function Pow() {
     setParams(next);
     setFilter('all');
     setKind('all');
-    setActor('');
     setRepo('');
     setDay('');
   }
@@ -786,13 +781,8 @@ export function Pow() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
-            {(actor || repo) && (
+            {repo && (
               <div className="flex flex-wrap gap-1.5">
-                {actor && (
-                  <button className={chipClass(true)} onClick={() => setActor('')}>
-                    dev: {short(displayName(actor))} ×
-                  </button>
-                )}
                 {repo && (
                   <button className={chipClass(true)} onClick={() => setRepo('')}>
                     repo: {repo} ×
@@ -839,7 +829,7 @@ export function Pow() {
                 year={year}
                 platform="combined"
                 platforms={heatmapPlatforms}
-                filteredView={kind !== 'all' || !!query || !!actor || !!repo}
+                filteredView={kind !== 'all' || !!query || !!repo}
                 dates={filtered.map(({ event }) => event.timestamp.slice(0, 10))}
                 sourceDates={filtered.map(({ event, source }) => ({
                   date: event.timestamp.slice(0, 10),
@@ -868,7 +858,7 @@ export function Pow() {
                     key={platform}
                     year={year}
                     platform={platform}
-                    filteredView={kind !== 'all' || !!query || !!actor || !!repo}
+                    filteredView={kind !== 'all' || !!query || !!repo}
                     dates={activity.map(({ event }) => event.timestamp.slice(0, 10))}
                     selected={filter === platform || filter === 'repo' ? day : ''}
                     onSelect={(date) => {
@@ -906,7 +896,6 @@ export function Pow() {
       ) : (
         <Timeline
           events={timeline}
-          onSelectActor={setActor}
           onSelectRepo={(value) => {
             if (!['nostr', 'ngit'].includes(value)) setRepo(value);
           }}

@@ -32,6 +32,9 @@ function FilterButton({
   title?: string;
   children: React.ReactNode;
 }) {
+  if (!onSelect) {
+    return <span className={`truncate text-left ${className}`}>{children}</span>;
+  }
   return (
     <button
       type="button"
