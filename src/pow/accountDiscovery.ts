@@ -1,5 +1,6 @@
 import { nip19, verifyEvent, type Event } from 'nostr-tools';
 import { parseSource } from './model.js';
+import { nip05Address } from './nip05.js';
 
 export function profileNpubs(text: string) {
   const found = new Set<string>();
@@ -11,6 +12,30 @@ export function profileNpubs(text: string) {
     }
   }
   return [...found].slice(0, 3);
+}
+
+export function profileNip05Links(text: string) {
+  const addresses = new Set<string>();
+  for (const match of text.matchAll(
+    /(?<![\w@./-])(?:https?:\/\/|njump\.(?:me|to)\/)[^\s<>"']+/gi,
+  )) {
+    try {
+      const value = match[0].replace(/[),.;!?]+$/, '');
+      const url = new URL(value.includes('://') ? value : `https://${value}`);
+      if (
+        !['njump.to', 'njump.me'].includes(url.hostname.toLowerCase()) ||
+        url.username ||
+        url.password ||
+        url.port
+      )
+        continue;
+      const path = /^\/([^/]+)\/?$/.exec(url.pathname);
+      if (path) addresses.add(nip05Address(decodeURIComponent(path[1])).address);
+    } catch {
+      /* Ignore links that do not identify a NIP-05 address. */
+    }
+  }
+  return [...addresses].slice(0, 3);
 }
 
 export function githubClaims(event: Event | null, npub: string) {

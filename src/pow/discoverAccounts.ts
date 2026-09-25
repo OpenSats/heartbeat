@@ -3,6 +3,7 @@ import {
   githubClaims,
   matchingGithubProof,
   profileNpubs,
+  profileNip05Links,
   profileMetadata,
   websiteDomain,
 } from './accountDiscovery.js';
@@ -41,22 +42,24 @@ export async function discoverAccounts(
       try {
         const data = await read(kind, value);
         if (kind === 'github') {
-          const npubs = profileNpubs(
-            [data.bio, data.blog, ...(data.social ?? [])]
-              .filter((v) => typeof v === 'string')
-              .join('\n'),
-          );
-          const domain = websiteDomain(data.blog);
-          if (domain && !npubs.length) {
-            try {
-              npubs.push(await resolve(domain));
-            } catch {
-              /* Optional website discovery. */
+          const text = [data.bio, data.blog, ...(data.social ?? [])]
+            .filter((v) => typeof v === 'string')
+            .join('\n');
+          const npubs = profileNpubs(text);
+          if (!npubs.length) {
+            const addresses = profileNip05Links(text);
+            const domain = websiteDomain(data.blog);
+            if (domain) addresses.push(domain);
+            const resolved = await Promise.allSettled(
+              [...new Set(addresses)].slice(0, 3).map(resolve),
+            );
+            for (const result of resolved) {
+              if (result.status === 'fulfilled') npubs.push(result.value);
             }
           }
           return [
             key,
-            npubs.map((npub) => ({
+            [...new Set(npubs)].map((npub) => ({
               parameter: 'p',
               value: npub,
               from: value,
