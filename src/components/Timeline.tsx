@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { EventRow, type TimelineEvent } from './EventRow';
 
 type Props = {
-  events: TimelineTimelineEvent[];
+  events: TimelineEvent[];
   onSelectRepo?: (repo: string) => void;
   onSelectActor?: (actor: string) => void;
 };
