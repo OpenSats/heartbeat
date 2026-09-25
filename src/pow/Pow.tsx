@@ -312,13 +312,6 @@ function Heatmap({
           </div>
         </div>
       </div>
-      <p className="text-[10px] text-zinc-600 mt-2">
-        {platform === 'combined'
-          ? 'Striped cells mean at least one selected source has incomplete or uncertain coverage. An empty day does not confirm inactivity.'
-          : platform === 'github'
-            ? 'Striped cells are incomplete. Plain empty cells have no fetched GitHub events matching the current filters.'
-            : 'Striped cells reflect uncertain relay coverage. An empty day does not confirm inactivity.'}
-      </p>
     </div>
   );
 }
@@ -775,6 +768,11 @@ export function Pow() {
               })
             )}
           </div>
+          <p className="px-3 py-2 text-[10px] text-zinc-600 border-b border-zinc-900">
+            {heatmapPlatforms.some((platform) => platform !== 'github')
+              ? 'Striped cells reflect incomplete or uncertain relay coverage. An empty day does not confirm inactivity.'
+              : 'Striped cells are incomplete. Plain empty cells have no fetched GitHub events matching the current filters.'}
+          </p>
         </div>
       )}
       {!sources.length && resolving.length ? (
