@@ -205,15 +205,15 @@ function SourceStatus({
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <rect x="5" y="10" width="14" height="11" rx="2" />
-              <path
-                d={
-                  accountLink.method === 'nip39'
-                    ? 'M8 10V6a4 4 0 0 1 8 0v4'
-                    : 'M8 10V6a4 4 0 0 1 7.5-2'
-                }
-              />
-              <path d="M12 14v3" />
+              <circle cx="12" cy="12" r="9" />
+              {accountLink.method === 'nip39' ? (
+                <path d="m8 12 3 3 5-6" />
+              ) : (
+                <>
+                  <path d="M9.5 9a2.5 2.5 0 1 1 4.3 1.7C12.7 11.5 12 12 12 13" />
+                  <circle cx="12" cy="16" r="0.75" fill="currentColor" stroke="none" />
+                </>
+              )}
             </svg>
           </a>
         )}
