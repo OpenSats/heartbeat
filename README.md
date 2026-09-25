@@ -128,7 +128,10 @@ compatible. The old budget table is retained for older previews but these worker
 no longer use it. Very large month responses are bounded at 3 MB and explicitly
 marked incomplete.
 
-The page sends no combined identifiers to the API and suppresses Referer headers.
+Activity requests identify one source at a time and suppress Referer headers.
+Social image requests include the URL-selected sources; the renderer combines them
+in memory and caches the resulting image at the CDN without storing account
+associations in the database.
 Full page URLs can still appear in browser history and hosting access logs; do not
 add analytics that store query strings. Database credentials stay server-side.
 

@@ -81,7 +81,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       /<meta\b[^>]*(?:property|name)=["'](?:og:[^"']*|twitter:[^"']*|description)["'][^>]*>/gi,
       '',
     )
-    .replace('</head>', `${meta}\n</head>`);
+    .replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi, '')
+    .replace(
+      '</head>',
+      `<link rel="canonical" href="${escapeHtml(canonical.toString())}" />\n${meta}\n</head>`,
+    );
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600');
   res.setHeader('Referrer-Policy', 'no-referrer');
