@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { githubClaims, matchingGithubProof, profileNpubs } from './accountDiscovery';
 import type { Source } from './model';
 
-type Suggestion = {
+export type DiscoveredAccount = {
   parameter: 'p' | 'gh';
   value: string;
   from: string;
   evidenceUrl: string;
   verified: boolean;
 };
-export function useAccountDiscovery(sources: Source[]) {
-  const [found, setFound] = useState<Record<string, Suggestion[]>>({});
+export function useAccountDiscovery(
+  sources: Source[],
+  onDiscovered: (accounts: DiscoveredAccount[]) => void,
+) {
   const inputs = [
     ...new Map(
       sources
@@ -35,7 +37,7 @@ export function useAccountDiscovery(sources: Source[]) {
       return response.json();
     };
     void Promise.all(
-      inputs.map(async ({ kind, value }): Promise<[string, Suggestion[]]> => {
+      inputs.map(async ({ kind, value }): Promise<[string, DiscoveredAccount[]]> => {
         const key = `${kind}:${value}`;
         try {
           const data = await read(kind, value);
@@ -54,7 +56,7 @@ export function useAccountDiscovery(sources: Source[]) {
                 verified: false,
               })),
             ];
-          const suggestions: Suggestion[] = [];
+          const suggestions: DiscoveredAccount[] = [];
           for (const claim of githubClaims(data.event, value)) {
             try {
               const proof = await read('gist', claim.gist);
@@ -76,17 +78,19 @@ export function useAccountDiscovery(sources: Source[]) {
         }
       }),
     ).then((entries) => {
-      if (!controller.signal.aborted) setFound(Object.fromEntries(entries));
+      if (!controller.signal.aborted) {
+        const existing = new Set(inputs.map(({ value }) => value));
+        const accounts = [
+          ...new Map(
+            entries
+              .flatMap(([, accounts]) => accounts)
+              .filter((account) => !existing.has(account.value))
+              .map((account) => [`${account.parameter}:${account.value}`, account]),
+          ).values(),
+        ];
+        if (accounts.length) onDiscovered(accounts);
+      }
     });
     return () => controller.abort();
-  }, [inputKey]);
-  const existing = new Set(inputs.map(({ value }) => value));
-  return [
-    ...new Map(
-      inputs
-        .flatMap(({ kind, value }) => found[`${kind}:${value}`] ?? [])
-        .filter((suggestion) => !existing.has(suggestion.value))
-        .map((suggestion) => [`${suggestion.parameter}:${suggestion.value}`, suggestion]),
-    ).values(),
-  ];
+  }, [inputKey, onDiscovered]);
 }
