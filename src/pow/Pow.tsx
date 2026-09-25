@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
 import { EVENT_TYPE_META } from '../eventTypes';
+import { useSources } from './useSources';
 import {
   activityRange,
   sourcePlatform,
@@ -10,7 +11,6 @@ import {
   FIRST_HISTORY_YEAR,
   selectedYear,
   historyMonths,
-  sourcesFromUrl,
   type Source,
   type SourceResult,
 } from './model';
@@ -344,7 +344,7 @@ export function Pow() {
   const [copied, setCopied] = useState(false);
   const [combinedHeatmap, setCombinedHeatmap] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const { sources, errors } = useMemo(() => sourcesFromUrl(params), [params]);
+  const { sources, errors, pending: resolving } = useSources(params);
   const onResult = useMemo(
     () => (key: string, result: SourceResult) =>
       setPeriodResults((prev) => ({ ...prev, [periodKey]: { ...prev[periodKey], [key]: result } })),
@@ -577,10 +577,10 @@ export function Pow() {
         {!hasSources(params) && (
           <form onSubmit={submit} className="space-y-2">
             <label className="flex items-center gap-1.5">
-              <span className="text-zinc-600 text-xs shrink-0 w-14">npub:</span>
+              <span className="text-zinc-600 text-xs shrink-0 w-14">nostr:</span>
               <input
                 className={inputClass}
-                placeholder="npub1…"
+                placeholder="npub1…, domain, or name@domain"
                 value={npub}
                 onChange={(e) => setNpub(e.target.value)}
                 spellCheck={false}
@@ -611,6 +611,11 @@ export function Pow() {
             </div>
           </form>
         )}
+        {resolving.map((address) => (
+          <p key={address} role="status" className="text-xs text-zinc-500">
+            resolving {address}...
+          </p>
+        ))}
         {errors.map((error) => (
           <p role="alert" key={error} className="text-xs text-amber-300">
             {error}
@@ -772,9 +777,11 @@ export function Pow() {
           </div>
         </div>
       )}
-      {!sources.length ? (
+      {!sources.length && resolving.length ? (
+        <div className="text-zinc-500 px-2 py-8">Resolving Nostr address...</div>
+      ) : !sources.length ? (
         <div className="text-zinc-500 px-2 py-8 text-sm">
-          Enter a GitHub handle or npub to load activity.{' '}
+          Enter a GitHub handle, npub, or NIP-05 address to load activity.{' '}
           <a href="/pow?gh=dergigi" className="text-zinc-400">
             Try dergigi
           </a>
