@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { sourcesFromUrl, parseSource, type IdentityResolution } from './model';
 
-export function useSources(params: URLSearchParams) {
+export function useSources(params: URLSearchParams, suppliedParams = params) {
   const [resolutions, setResolutions] = useState<Record<string, IdentityResolution>>({});
   const parsed = useMemo(() => sourcesFromUrl(params, resolutions), [params, resolutions]);
+  const suppliedSourceKeys = useMemo(
+    () => new Set(sourcesFromUrl(suppliedParams, resolutions).sources.map((source) => source.key)),
+    [suppliedParams, resolutions],
+  );
   const pendingKey = JSON.stringify(parsed.pending);
   useEffect(() => {
     const addresses: string[] = JSON.parse(pendingKey);
@@ -31,5 +35,5 @@ export function useSources(params: URLSearchParams) {
     });
     return () => controller.abort();
   }, [pendingKey]);
-  return parsed;
+  return { ...parsed, suppliedSourceKeys };
 }

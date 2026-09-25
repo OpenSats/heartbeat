@@ -43,6 +43,10 @@ const years = Array.from(
   (_, i) => currentYear - i,
 );
 const initial = powParams(window.location.pathname, window.location.search);
+const suppliedInputs = (fallback: URLSearchParams) =>
+  typeof history.state?.powSuppliedParams === 'string'
+    ? new URLSearchParams(history.state.powSuppliedParams)
+    : fallback;
 const hasSources = (params: URLSearchParams) =>
   ['p', 'gh', 'ngit', 'repo'].some((key) => params.has(key));
 const chipClass = (active = false) =>
@@ -454,6 +458,7 @@ export function Pow() {
   const [npub, setNpub] = useState(initial.get('p') ?? '');
   const [repos, setRepos] = useState(initial.getAll('repo').join(', '));
   const [params, setParams] = useState(initial);
+  const [suppliedParams, setSuppliedParams] = useState(() => suppliedInputs(initial));
   const [periodResults, setPeriodResults] = useState<Record<string, Record<string, SourceResult>>>(
     {},
   );
@@ -474,7 +479,12 @@ export function Pow() {
   const [copied, setCopied] = useState(false);
   const [combinedHeatmap, setCombinedHeatmap] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const { sources, errors, pending: resolving } = useSources(params);
+  const {
+    sources,
+    errors,
+    pending: resolving,
+    suppliedSourceKeys,
+  } = useSources(params, suppliedParams);
   const addDiscoveredAccounts = useMemo(
     () => (accounts: DiscoveredAccount[]) => {
       const next = new URLSearchParams(params);
@@ -488,12 +498,16 @@ export function Pow() {
         changed = true;
       }
       if (!changed) return;
-      history.replaceState(null, '', powUrl(next, location.pathname));
+      history.replaceState(
+        { powSuppliedParams: suppliedParams.toString() },
+        '',
+        powUrl(next, location.pathname),
+      );
       setParams(next);
       setNpub(next.get('p') ?? '');
       setGh(next.getAll('gh').join(', '));
     },
-    [params, sources],
+    [params, sources, suppliedParams],
   );
   const accountEvidence = useAccountDiscovery(sources, addDiscoveredAccounts);
   const displayName = useNip05Labels(sources.map((source) => source.label.split('/')[0]));
@@ -515,6 +529,7 @@ export function Pow() {
   useEffect(() => {
     const pop = () => {
       const next = powParams(location.pathname, location.search);
+      setSuppliedParams(suppliedInputs(next));
       setParams(next);
       setGh(next.getAll('gh').join(', '));
       setNpub(next.get('p') ?? '');
@@ -638,7 +653,11 @@ export function Pow() {
     const next = new URLSearchParams(params);
     if (value === null) next.delete('year');
     else next.set('year', String(value));
-    history.pushState(null, '', powUrl(next, location.pathname));
+    history.pushState(
+      { powSuppliedParams: suppliedParams.toString() },
+      '',
+      powUrl(next, location.pathname),
+    );
     setParams(next);
     setDay('');
     setKind('all');
@@ -660,7 +679,8 @@ export function Pow() {
       .map((s) => s.trim())
       .filter(Boolean))
       next.append('repo', value);
-    history.pushState(null, '', powUrl(next, location.pathname));
+    history.pushState({ powSuppliedParams: next.toString() }, '', powUrl(next, location.pathname));
+    setSuppliedParams(next);
     setParams(next);
     setFilter('all');
     setKind('all');
@@ -881,6 +901,7 @@ export function Pow() {
                     accountEvidence.find(
                       (account) =>
                         !account.verified &&
+                        !suppliedSourceKeys.has(source.key) &&
                         account.parameter === 'p' &&
                         ['nostr', 'ngit'].includes(source.kind) &&
                         account.value === source.label &&
