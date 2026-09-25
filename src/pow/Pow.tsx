@@ -60,13 +60,13 @@ function SourceStatus({
   year,
   source,
   displayLabel,
-  inferredFrom,
+  accountLink,
   onResult,
 }: {
   year: number | null;
   source: Source;
   displayLabel: string;
-  inferredFrom?: DiscoveredAccount;
+  accountLink?: DiscoveredAccount;
   onResult: (key: string, result: SourceResult) => void;
 }) {
   const [result, setResult] = useState<SourceResult | null>(null);
@@ -169,6 +169,12 @@ function SourceStatus({
           : result.stale
             ? 'stale'
             : '';
+  const accountTooltip =
+    accountLink?.method === 'nip39'
+      ? `Linked by a verified NIP-39 proof from ${short(accountLink.from)}. View GitHub proof.`
+      : accountLink
+        ? `Inferred from ${accountLink.from}’s GitHub profile or linked website. Account ownership hasn’t been verified.`
+        : undefined;
   return (
     <details className="text-xs text-zinc-600">
       <summary className="cursor-pointer hover:text-zinc-300 py-0.5">
@@ -176,14 +182,14 @@ function SourceStatus({
         <span className={sourceColor(source)} title={source.label}>
           {short(displayLabel)}
         </span>
-        {inferredFrom && (
+        {accountLink && (
           <a
-            href={inferredFrom.evidenceUrl}
+            href={accountLink.evidenceUrl}
             target="_blank"
             rel="noreferrer noopener"
             className="inline-flex align-middle ml-1 text-zinc-600 hover:text-zinc-400"
-            title={`Inferred from ${inferredFrom.from}’s GitHub profile or linked website. Account ownership hasn’t been verified.`}
-            aria-label={`Inferred account. Found through ${inferredFrom.from}’s GitHub profile; ownership unverified. View source.`}
+            title={accountTooltip}
+            aria-label={accountTooltip}
           >
             <svg
               aria-hidden="true"
@@ -196,7 +202,7 @@ function SourceStatus({
               strokeLinejoin="round"
             >
               <circle cx="12" cy="12" r="9" />
-              <path d="M12 11v5M12 8h.01" />
+              <path d={accountLink.method === 'nip39' ? 'm8 12 3 3 5-6' : 'M12 11v5M12 8h.01'} />
             </svg>
           </a>
         )}
@@ -860,23 +866,36 @@ export function Pow() {
                   year={year}
                   source={source}
                   displayLabel={displayName(source.label)}
-                  inferredFrom={accountEvidence.find(
-                    (account) =>
-                      !account.verified &&
-                      account.parameter === 'p' &&
-                      ['nostr', 'ngit'].includes(source.kind) &&
-                      account.value === source.label &&
-                      sources.some(
-                        (input) => input.kind === 'github' && input.value === account.from,
-                      ) &&
-                      !accountEvidence.some(
-                        (proof) =>
-                          proof.verified &&
-                          proof.parameter === 'gh' &&
-                          proof.value === account.from &&
-                          proof.from === account.value,
-                      ),
-                  )}
+                  accountLink={
+                    accountEvidence.find(
+                      (account) =>
+                        source.kind === 'github' &&
+                        account.method === 'nip39' &&
+                        account.verified &&
+                        account.value === source.value &&
+                        sources.some(
+                          (input) =>
+                            ['nostr', 'ngit'].includes(input.kind) && input.label === account.from,
+                        ),
+                    ) ??
+                    accountEvidence.find(
+                      (account) =>
+                        !account.verified &&
+                        account.parameter === 'p' &&
+                        ['nostr', 'ngit'].includes(source.kind) &&
+                        account.value === source.label &&
+                        sources.some(
+                          (input) => input.kind === 'github' && input.value === account.from,
+                        ) &&
+                        !accountEvidence.some(
+                          (proof) =>
+                            proof.verified &&
+                            proof.parameter === 'gh' &&
+                            proof.value === account.from &&
+                            proof.from === account.value,
+                        ),
+                    )
+                  }
                   onResult={onResult}
                 />
               ))}

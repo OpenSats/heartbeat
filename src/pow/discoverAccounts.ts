@@ -27,6 +27,7 @@ export type DiscoveredAccount = {
   from: string;
   evidenceUrl: string;
   verified: boolean;
+  method: 'profile' | 'nip39' | 'reciprocal';
 };
 export async function discoverAccounts(
   inputs: AccountInput[],
@@ -61,6 +62,7 @@ export async function discoverAccounts(
               from: value,
               evidenceUrl: `https://github.com/${value}`,
               verified: false,
+              method: 'profile',
             })),
           ];
         }
@@ -75,6 +77,7 @@ export async function discoverAccounts(
                 from: value,
                 evidenceUrl: `https://gist.github.com/${claim.handle}/${claim.gist}`,
                 verified: true,
+                method: 'nip39',
               });
           } catch {
             /* Unavailable proofs are not verified. */
@@ -115,6 +118,7 @@ export async function discoverAccounts(
                 from: value,
                 evidenceUrl: `https://github.com/${candidate}`,
                 verified: true,
+                method: 'reciprocal',
               });
           }
         } catch {
