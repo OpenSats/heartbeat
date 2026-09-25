@@ -42,8 +42,11 @@ function heatmap(preview: Preview) {
     const x = Math.floor(index / 7) * 20 + 2;
     const y = (index % 7) * 20 + 32;
     if (date.endsWith('-01') || time === start) {
-      // Avoid overlapping the first label when the range starts at the end of a month.
-      if (time === start || time - start > 7 * 86400000)
+      // Omit a short opening month so the following month label remains visible.
+      if (
+        date.endsWith('-01') ||
+        new Date(time + 7 * 86400000).getUTCMonth() === new Date(time).getUTCMonth()
+      )
         months.push({
           x,
           label: new Date(time).toLocaleString('en', { month: 'short', timeZone: 'UTC' }),
