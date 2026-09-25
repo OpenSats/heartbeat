@@ -60,11 +60,13 @@ function SourceStatus({
   year,
   source,
   displayLabel,
+  inferredFrom,
   onResult,
 }: {
   year: number | null;
   source: Source;
   displayLabel: string;
+  inferredFrom?: DiscoveredAccount;
   onResult: (key: string, result: SourceResult) => void;
 }) {
   const [result, setResult] = useState<SourceResult | null>(null);
@@ -174,6 +176,30 @@ function SourceStatus({
         <span className={sourceColor(source)} title={source.label}>
           {short(displayLabel)}
         </span>
+        {inferredFrom && (
+          <a
+            href={inferredFrom.evidenceUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex align-middle ml-1 text-zinc-600 hover:text-zinc-400"
+            title={`Inferred from ${inferredFrom.from}’s GitHub profile or linked website. Account ownership hasn’t been verified.`}
+            aria-label={`Inferred account. Found through ${inferredFrom.from}’s GitHub profile; ownership unverified. View source.`}
+          >
+            <svg
+              aria-hidden="true"
+              className="h-3 w-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v5M12 8h.01" />
+            </svg>
+          </a>
+        )}
         {status && (
           <>
             {' '}
@@ -463,7 +489,7 @@ export function Pow() {
     },
     [params, sources],
   );
-  useAccountDiscovery(sources, addDiscoveredAccounts);
+  const accountEvidence = useAccountDiscovery(sources, addDiscoveredAccounts);
   const displayName = useNip05Labels(sources.map((source) => source.label.split('/')[0]));
   const onResult = useMemo(
     () => (key: string, result: SourceResult) =>
@@ -834,6 +860,23 @@ export function Pow() {
                   year={year}
                   source={source}
                   displayLabel={displayName(source.label)}
+                  inferredFrom={accountEvidence.find(
+                    (account) =>
+                      !account.verified &&
+                      account.parameter === 'p' &&
+                      ['nostr', 'ngit'].includes(source.kind) &&
+                      account.value === source.label &&
+                      sources.some(
+                        (input) => input.kind === 'github' && input.value === account.from,
+                      ) &&
+                      !accountEvidence.some(
+                        (proof) =>
+                          proof.verified &&
+                          proof.parameter === 'gh' &&
+                          proof.value === account.from &&
+                          proof.from === account.value,
+                      ),
+                  )}
                   onResult={onResult}
                 />
               ))}

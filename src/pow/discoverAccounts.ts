@@ -32,6 +32,7 @@ export async function discoverAccounts(
   inputs: AccountInput[],
   read: (kind: string, value: string) => Promise<AccountEvidence>,
   resolve: (address: string) => Promise<string>,
+  options: { includeExisting?: boolean } = {},
 ) {
   const entries = await Promise.all(
     inputs.map(async ({ kind, value }): Promise<[string, DiscoveredAccount[]]> => {
@@ -130,7 +131,7 @@ export async function discoverAccounts(
     ...new Map(
       entries
         .flatMap(([, accounts]) => accounts)
-        .filter((account) => !existing.has(account.value))
+        .filter((account) => options.includeExisting || !existing.has(account.value))
         .map((account) => [`${account.parameter}:${account.value}`, account]),
     ).values(),
   ];

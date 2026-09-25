@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { discoverAccounts, type DiscoveredAccount } from './discoverAccounts';
 import { parseSource, type Source } from './model';
 export type { DiscoveredAccount } from './discoverAccounts';
@@ -7,6 +7,7 @@ export function useAccountDiscovery(
   sources: Source[],
   onDiscovered: (accounts: DiscoveredAccount[]) => void,
 ) {
+  const [evidence, setEvidence] = useState<DiscoveredAccount[]>([]);
   const inputs = [
     ...new Map(
       sources
@@ -42,9 +43,15 @@ export function useAccountDiscovery(
       const data = await response.json();
       return parseSource('nostr', data.npub).label;
     };
-    void discoverAccounts(inputs, read, resolve).then((accounts) => {
-      if (!controller.signal.aborted && accounts.length) onDiscovered(accounts);
+    void discoverAccounts(inputs, read, resolve, { includeExisting: true }).then((accounts) => {
+      if (controller.signal.aborted) return;
+      setEvidence(accounts);
+      const additions = accounts.filter(
+        (account) => !inputs.some((input) => input.value === account.value),
+      );
+      if (additions.length) onDiscovered(additions);
     });
     return () => controller.abort();
   }, [inputKey, onDiscovered]);
+  return evidence;
 }
