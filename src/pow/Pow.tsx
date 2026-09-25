@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RelayInfo } from './RelayInfo';
 import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
 import { EVENT_TYPE_META } from '../eventTypes';
@@ -8,6 +9,7 @@ import { useNip05Labels } from './useNip05Labels';
 import { useAccountDiscovery, type DiscoveredAccount } from './useAccountDiscovery';
 import {
   activityRange,
+  latestRelayFetches,
   sourcePlatform,
   isRepository,
   matchesSource,
@@ -95,6 +97,9 @@ function SourceStatus({
           ? {
               events: [...activities.values()],
               windows,
+              relayFetches: latestRelayFetches(
+                snapshots.flatMap((snapshot) => snapshot.relayFetches ?? []),
+              ),
               profileUrl: snapshots[0].profileUrl.replace('https://njump.me/', 'https://njump.to/'),
               coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from the author’s NIP-65 write relays and public fallback relays. Relays can omit history, so empty days remain uncertain.' : sourcePlatform(source) === 'ngit' ? 'Signed patches, PRs, issues, code comments, status messages and repository updates. Ref updates are not individual commits. Relays may omit history or replace older state.' : 'Public commits, issues, PRs, comments, reviews and status changes. Cross-repository discovery and GitHub indexing can omit activity.'}${isRepository(source) ? ' Repository context includes all contributors.' : ''}${source.kind === 'grasp' ? ' Comments and status messages without repository tags may be missing.' : ''}`,
             }
@@ -646,6 +651,7 @@ export function Pow() {
             </a>
           </h1>
           <div className="flex items-center gap-3">
+            <RelayInfo sources={sources} results={results} />
             <button
               className="p-1 text-zinc-500 hover:text-zinc-300"
               aria-label={copied ? 'Link copied' : 'Copy link'}

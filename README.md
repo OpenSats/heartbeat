@@ -151,6 +151,10 @@ GitHub repository periods are striped in the heatmap. Plain empty repository cel
 mean no indexed activity in the fetched GitHub categories. Today remains uncertain until complete.
 Click a day to filter the timeline. The source form is hidden when URL parameters
 are present. Nostr links use njump.to.
+The relay icon beside copy shows cached Nostr/ngit fetch provenance: relay URL,
+last fetch time, result, and events returned by that fetch. The dots describe
+recorded fetches, not live connections. Older snapshots without provenance remain
+usable and are not refetched solely to populate this panel.
 
 Vercel Queues runs separate GitHub and Nostr consumers, configured in `vercel.json`.
 No extra queue credentials are needed on Vercel. GitHub has one worker per deployment;
