@@ -8,6 +8,7 @@ export type TimelineEvent = Omit<Event, 'type'> & {
   meta?: EventTypeMeta;
   context?: string;
   actorLabel?: string;
+  actorHref?: string;
 };
 
 type Props = {
@@ -71,13 +72,23 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
       >
         <RepoLabel repo={event.repo} />
       </FilterButton>
-      <FilterButton
-        value={event.actor}
-        onSelect={onSelectActor}
-        className="text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
-      >
-        {event.actorLabel ?? event.actor}
-      </FilterButton>
+      {event.actorHref ? (
+        <a
+          href={event.actorHref}
+          title={`View ${event.actorLabel ?? event.actor}'s activity`}
+          className="transition-colors truncate text-left text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
+        >
+          {event.actorLabel ?? event.actor}
+        </a>
+      ) : (
+        <FilterButton
+          value={event.actor}
+          onSelect={onSelectActor}
+          className="text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
+        >
+          {event.actorLabel ?? event.actor}
+        </FilterButton>
+      )}
       {event.context && (
         <span className="text-xs text-amber-500/70" title={event.context}>
           repo context

@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { githubPowPath } from './lib/powLinks';
 import { loadEvents } from './lib/loadEvents';
 import { useUrlSet } from './lib/useUrlSet';
 import { Timeline } from './components/Timeline';
@@ -46,13 +47,21 @@ export function App() {
   const filtered = useMemo(() => {
     if (!data) return [];
     const inSet = (s: Set<string> | null, v: string) => !s || s.size === 0 || s.has(v);
-    return data.events.filter(
-      (e) =>
-        (!fundReposUnion || fundReposUnion.has(e.repo)) &&
-        inSet(repoFilter.selected, e.repo) &&
-        inSet(typeFilter.selected, e.type) &&
-        inSet(actorFilter.selected, e.actor),
-    );
+    return data.events
+      .filter(
+        (e) =>
+          (!fundReposUnion || fundReposUnion.has(e.repo)) &&
+          inSet(repoFilter.selected, e.repo) &&
+          inSet(typeFilter.selected, e.type) &&
+          inSet(actorFilter.selected, e.actor),
+      )
+      .map((event) => ({
+        ...event,
+        // Handles from other Git hosts need their own identity support in PoW.
+        actorHref: event.url.startsWith('https://github.com/')
+          ? githubPowPath(event.actor)
+          : undefined,
+      }));
   }, [data, fundReposUnion, repoFilter.selected, typeFilter.selected, actorFilter.selected]);
 
   // Defer the timeline so filter input/chips stay responsive.
@@ -119,7 +128,11 @@ export function App() {
           actorFilter={actorFilter}
         />
       </div>
-      <Timeline events={deferredFiltered} onSelectRepo={onSelectRepo} onSelectActor={onSelectActor} />
+      <Timeline
+        events={deferredFiltered}
+        onSelectRepo={onSelectRepo}
+        onSelectActor={onSelectActor}
+      />
       <footer className="px-3 py-4 text-xs text-zinc-600 border-t border-zinc-900 space-y-1">
         <div>
           <a href="/pow" className="text-emerald-400">
