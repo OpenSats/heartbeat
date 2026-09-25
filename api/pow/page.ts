@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ).slice(0, 120);
   const title = `heartbeat/pow · ${label}`;
   const description =
-    'Public activity across GitHub, Nostr, and ngit / GRASP. A year of activity in one heatmap.';
+    'Public activity across GitHub, Nostr, and ngit. A year of activity in one heatmap.';
   params.sort();
   const image = `${origin}/api/pow/og?${params.toString()}`;
   const canonical = new URL(person ? `/pow/${encodeURIComponent(person)}` : '/pow', origin);

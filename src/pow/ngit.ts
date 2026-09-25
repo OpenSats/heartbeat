@@ -57,9 +57,10 @@ export function parseGrasp(input: string): Source {
         url.hash ||
         (url.port && url.port !== '443')
       )
-        throw new Error('Use a public GRASP repository URL.');
+        throw new Error('Use a public ngit repository URL.');
       parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
-      if (parts.length !== 2) throw new Error('Use a GRASP URL ending in /npub/repository.git.');
+      if (parts.length !== 2)
+        throw new Error('Use a ngit repository URL ending in /npub/repository.git.');
       relays = [relayUrl(`wss://${url.host}`)];
       parts[1] = parts[1].replace(/\.git$/, '');
     } else {
@@ -69,7 +70,7 @@ export function parseGrasp(input: string): Source {
         parts.splice(1, 1);
       }
       if (parts.length !== 2)
-        throw new Error('Use nostr://npub/repository, an naddr, or a GRASP HTTPS URL.');
+        throw new Error('Use nostr://npub/repository, an naddr, or a ngit repository HTTPS URL.');
     }
     const decoded = nip19.decode(parts[0]);
     if (decoded.type !== 'npub') throw new Error('The repository owner must be an npub.');

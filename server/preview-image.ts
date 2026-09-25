@@ -13,7 +13,7 @@ const palette = {
 const labels = {
   github: 'GitHub events',
   nostr: 'Nostr posts + replies',
-  ngit: 'ngit / GRASP events',
+  ngit: 'ngit events',
 };
 function cellColor(counts: Partial<Record<Platform, number>>) {
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);

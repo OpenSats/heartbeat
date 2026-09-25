@@ -117,7 +117,9 @@ export function parseSource(kind: string, input: string): Source {
       !/^[a-z0-9-]+\/[a-z0-9_.-]+$/.test(value) ||
       value.split('/').some((v) => v === '.' || v === '..')
     )
-      throw new Error('Use owner/repo, a GitHub URL, nostr://npub/repo, an naddr, or a GRASP URL.');
+      throw new Error(
+        'Use owner/repo, a GitHub URL, nostr://npub/repo, an naddr, or a ngit repository URL.',
+      );
     return { key: `repo:${value}`, kind, value, label: value };
   }
   throw new Error('Unknown source type.');

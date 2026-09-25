@@ -151,7 +151,7 @@ function SourceStatus({
   return (
     <details className="text-xs text-zinc-600">
       <summary className="cursor-pointer hover:text-zinc-300 py-0.5">
-        <span className="text-zinc-500">{source.kind}:</span>{' '}
+        <span className="text-zinc-500">{source.kind === 'grasp' ? 'ngit' : source.kind}:</span>{' '}
         <span className={sourceColor(source)} title={source.label}>
           {short(displayLabel)}
         </span>{' '}
@@ -189,7 +189,7 @@ function SourceStatus({
 const heatmapSourceColors = {
   github: { color: 'emerald', label: 'GitHub' },
   nostr: { color: 'violet', label: 'Nostr' },
-  ngit: { color: 'amber', label: 'ngit / GRASP' },
+  ngit: { color: 'amber', label: 'ngit' },
 } as const;
 type HeatmapPlatform = keyof typeof heatmapSourceColors;
 
@@ -258,7 +258,7 @@ function Heatmap({
   const eventLabels = {
     github: 'GitHub events',
     nostr: 'Nostr posts and replies',
-    ngit: 'ngit / GRASP events',
+    ngit: 'ngit events',
   };
   const caption =
     platform === 'combined'
@@ -699,7 +699,7 @@ export function Pow() {
                 <span className="text-zinc-600 text-xs shrink-0 w-14">repos:</span>
                 <input
                   className={inputClass}
-                  placeholder="owner/repo, nostr://npub/repo, GRASP URL"
+                  placeholder="owner/repo, nostr://npub/repo, ngit repository URL"
                   value={repos}
                   onChange={(e) => setRepos(e.target.value)}
                   spellCheck={false}
