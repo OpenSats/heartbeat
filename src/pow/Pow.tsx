@@ -18,8 +18,22 @@ import {
   type SourceResult,
 } from './model';
 
+const typeGroups: Record<string, string> = {
+  commit: 'commits',
+  'pull request': 'PRs',
+  patch: 'PRs',
+  'PR update': 'PRs',
+  issue: 'issues',
+  'code comment': 'comments',
+  repository: 'repo updates',
+  'refs update': 'repo updates',
+  post: 'posts',
+  reply: 'replies',
+};
 const typeFilter = (type: string) =>
-  /^status: (open|closed|draft|resolved)$/.test(type) ? 'status changes' : type;
+  /^status: (open|closed|draft|resolved)$/.test(type)
+    ? 'status changes'
+    : (typeGroups[type] ?? type);
 
 const currentYear = new Date().getUTCFullYear();
 const years = Array.from(
@@ -744,7 +758,7 @@ export function Pow() {
                   className={chipClass(kind === value)}
                   onClick={() => setKind(value)}
                 >
-                  {value === 'pull request' ? 'PR' : value}
+                  {value}
                 </button>
               ))}
             </div>
