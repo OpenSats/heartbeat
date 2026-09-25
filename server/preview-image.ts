@@ -36,7 +36,7 @@ function heatmap(preview: Preview) {
   for (const day of preview.days)
     counts.set(day.date, { ...counts.get(day.date), [day.platform]: day.count });
   const cells: string[] = [];
-  const months: string[] = [];
+  const months: { x: number; label: string }[] = [];
   for (let time = start, index = offset; time <= end; time += 86400000, index++) {
     const date = new Date(time).toISOString().slice(0, 10);
     const x = Math.floor(index / 7) * 20 + 2;
@@ -44,9 +44,10 @@ function heatmap(preview: Preview) {
     if (date.endsWith('-01') || time === start) {
       // Avoid overlapping the first label when the range starts at the end of a month.
       if (time === start || time - start > 7 * 86400000)
-        months.push(
-          `<text x="${x}" y="18" fill="#71717a" font-family="monospace" font-size="13">${new Date(time).toLocaleString('en', { month: 'short', timeZone: 'UTC' })}</text>`,
-        );
+        months.push({
+          x,
+          label: new Date(time).toLocaleString('en', { month: 'short', timeZone: 'UTC' }),
+        });
     }
     cells.push(
       `<rect x="${x}" y="${y}" width="16" height="16" rx="3" fill="${cellColor(counts.get(date) ?? {})}"/>`,
@@ -54,8 +55,8 @@ function heatmap(preview: Preview) {
     if (!dayCovered(preview, date))
       cells.push(`<rect x="${x}" y="${y}" width="16" height="16" rx="3" fill="url(#uncertain)"/>`);
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="176"><defs><pattern id="uncertain" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1L1-1M0 6L6 0M5 7L7 5" stroke="#a1a1aa" stroke-opacity=".18" stroke-width="1"/></pattern></defs>${months.join('')}${cells.join('')}</svg>`;
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="176"><defs><pattern id="uncertain" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1L1-1M0 6L6 0M5 7L7 5" stroke="#a1a1aa" stroke-opacity=".18" stroke-width="1"/></pattern></defs>${cells.join('')}</svg>`;
+  return { src: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`, months };
 }
 let font: Promise<Buffer> | undefined;
 export async function renderPreview(preview: Preview, avatar?: string) {
@@ -93,6 +94,7 @@ export async function renderPreview(preview: Preview, avatar?: string) {
         : uncertainty
           ? 'Relay coverage uncertain'
           : 'Cached public activity';
+  const chart = heatmap(preview);
   const card = h(
     'div',
     {
@@ -187,7 +189,21 @@ export async function renderPreview(preview: Preview, avatar?: string) {
         ? h('div', { style: { fontSize: 22, color: '#a1a1aa' } }, 'GitHub / Nostr / ngit')
         : null,
     ),
-    h('img', { src: heatmap(preview), width: 1080, height: 176, style: { marginTop: 20 } }),
+    h(
+      'div',
+      { style: { display: 'flex', position: 'relative', width: 1080, height: 176, marginTop: 20 } },
+      h('img', { src: chart.src, width: 1080, height: 176 }),
+      ...chart.months.map(({ x, label }) =>
+        h(
+          'span',
+          {
+            key: x,
+            style: { position: 'absolute', left: x, top: 0, color: '#71717a', fontSize: 13 },
+          },
+          label,
+        ),
+      ),
+    ),
     h(
       'div',
       {
