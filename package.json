@@ -7,14 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "vercel-build": "npm run fetch && npm run build",
     "preview": "vite preview",
     "fetch": "tsx scripts/fetch.ts",
     "db:migrate": "tsx scripts/migrate-pow.ts",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:vercel": "npm run fetch && npm run build"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
