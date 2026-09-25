@@ -43,7 +43,7 @@ const landingExamples = [
   '/pow/dergigi.com',
   '/pow/suhailsaqan',
   '/pow/Kukks?p=kukks@kukks.org',
-  '/pow/jackjack?p=jack@primal.net',
+  '/pow/greenart7c3',
   '/pow/danconwaydev.com?gh=danconwaydev',
   '/pow?repo=OpenSats%2Fwebsite',
 ];
