@@ -35,6 +35,21 @@ Relay-backed heatmaps remain striped: relays can omit data, and replaceable
 repository state does not provide a complete history of pushes. Previously seen
 ngit events are retained when refreshing a month, even if a relay later drops them.
 
+TODO: ngit/GRASP Git commit history
+
+- [ ] Fetch Git history from public GRASP repositories in background workers, with
+      resumable backfills for the selected year.
+- [ ] Cache immutable commits indefinitely by repository and commit hash; fetch
+      new history incrementally and avoid duplicate counts across mirrors.
+- [ ] Distinguish commit authors, committers, and npub-signed ref publishers.
+      Define evidence for attributing commits to an npub; never assume the person
+      pushing a branch authored every commit. Keep uncertain attribution visible
+      and preserve the rule against storing account associations or a people registry.
+- [ ] Show commit activity separately from ref updates, with explicit date semantics
+      and coverage indicators. Missing refs, shallow history, or unavailable objects
+      must remain uncertain gaps. Git history alone cannot reconstruct push dates
+      lost when relays replace older ref updates.
+
 The browser defaults to 365 days and queues all requested months up front. A year selector
 loads calendar years back to 2008, stored as `year=2025` in the view URL. Each
 platform has a separate heatmap, yearly total, and coverage indicators.
