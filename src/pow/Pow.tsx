@@ -744,7 +744,7 @@ export function Pow() {
                   className={chipClass(kind === value)}
                   onClick={() => setKind(value)}
                 >
-                  {value}
+                  {value === 'pull request' ? 'PR' : value}
                 </button>
               ))}
             </div>
