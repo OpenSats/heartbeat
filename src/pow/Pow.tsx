@@ -717,8 +717,8 @@ export function Pow() {
           <div className="flex items-center gap-3">
             <button
               className="p-1 text-zinc-500 hover:text-zinc-300"
-              aria-label={copied ? 'Link copied' : 'Copy link'}
-              title={copied ? 'Link copied' : 'Copy link'}
+              aria-label={copied ? 'Link copied' : 'Share: copy link'}
+              title={copied ? 'Link copied' : 'Share: copy link'}
               onClick={() => {
                 void navigator.clipboard
                   .writeText(location.href)
@@ -743,8 +743,10 @@ export function Pow() {
                   <path d="m5 12 4 4L19 6" />
                 ) : (
                   <>
-                    <rect x="8" y="8" width="12" height="12" rx="2" />
-                    <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <path d="m8.6 10.5 6.8-4m-6.8 7 6.8 4" />
                   </>
                 )}
               </svg>
