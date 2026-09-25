@@ -166,15 +166,20 @@ function SourceStatus({
           ? `backfilling ${result.monthsLoaded ?? 0}/${result.monthsTotal ?? 13} months`
           : result.stale
             ? 'stale'
-            : 'cached';
+            : '';
   return (
     <details className="text-xs text-zinc-600">
       <summary className="cursor-pointer hover:text-zinc-300 py-0.5">
         <span className="text-zinc-500">{source.kind === 'grasp' ? 'ngit' : source.kind}:</span>{' '}
         <span className={sourceColor(source)} title={source.label}>
           {short(displayLabel)}
-        </span>{' '}
-        <span className={status === 'unavailable' ? 'text-amber-400' : ''}>{status}</span>
+        </span>
+        {status && (
+          <>
+            {' '}
+            <span className={status === 'unavailable' ? 'text-amber-400' : ''}>{status}</span>
+          </>
+        )}
         {result?.snapshot && <span> · {result.snapshot.events.length} events</span>}
         {isRepository(source) && <span> · all contributors</span>}
       </summary>
