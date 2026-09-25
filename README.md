@@ -106,13 +106,32 @@ it was current is fetched through month-end once it closes. Edits, deletions, an
 indexing changes after that require explicit cache invalidation.
 
 GitHub collection paginates commit and issue/PR search results. Intervals with
-more than 1,000 results are subdivided. Search pagination progress is saved between requests. Busy months resume on
-subsequent worker deliveries and remain marked incomplete until pagination finishes. Reviews and merge actions are excluded.
+more than 1,000 results are subdivided. Search and thread pagination progress is
+saved between worker deliveries. It discovers additional threads with `involves:`
+and `reviewed-by:` searches, then reads issue timelines, submitted reviews, and
+inline review comments. Comment and review authors, or status-event actors,
+determine attribution. Actions are dated when performed, not when the issue/PR
+was created. Closing, reopening, merging, draft, and ready-for-review transitions
+appear under “status changes”; comments and reviews have their own filter groups.
+Discovery uses thread updates from the requested month onward, including later
+updates, so old actions on recently updated threads are not excluded.
+
+Thread pages are cached independently for 24 hours by repository, issue/PR,
+endpoint, and page, and reused across people and months. GitHub monthly snapshots
+use `v4` keys; existing `v3` activity remains visible as incomplete while the new
+collector backfills. Older preview deployments cannot overwrite these expanded
+snapshots. Nostr/ngit cache keys remain unchanged. No database migration is needed.
+
+Cross-repository discovery is not exhaustive: searches can miss threads where
+someone only changed a status, and deleted or inaccessible content is unavailable.
+Person heatmaps therefore retain uncertain coverage even after all discovered
+pages have been fetched. This uncertainty does not trigger perpetual historical
+backfills: completed historical collection checkpoints remain cached indefinitely.
 Extra GitHub repos include all contributors. Other git hosts are not supported.
 Nostr paginates signed kind-1 notes across three fixed relays. Its relay coverage
-can never prove inactivity. All Nostr days, unfetched periods, and incomplete
-GitHub periods are striped in the heatmap. Plain empty cells mean no indexed
-activity in the fetched GitHub categories. Today remains uncertain until complete.
+can never prove inactivity. All Nostr days, person-level GitHub discovery, unfetched periods, and incomplete
+GitHub repository periods are striped in the heatmap. Plain empty repository cells
+mean no indexed activity in the fetched GitHub categories. Today remains uncertain until complete.
 Click a day to filter the timeline. The source form is hidden when URL parameters
 are present. Nostr links use njump.to.
 
