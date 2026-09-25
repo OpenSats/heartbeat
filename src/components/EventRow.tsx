@@ -6,7 +6,6 @@ import { displayRepo, RepoLabel } from './RepoLabel';
 export type TimelineEvent = Omit<Event, 'type'> & {
   type: string;
   meta?: EventTypeMeta;
-  context?: string;
   actorLabel?: string;
   actorHref?: string;
 };
@@ -91,11 +90,6 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
         >
           {event.actorLabel ?? event.actor}
         </FilterButton>
-      )}
-      {event.context && (
-        <span className="text-xs text-amber-500/70" title={event.context}>
-          repo context
-        </span>
       )}
       <a
         href={event.url}

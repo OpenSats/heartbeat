@@ -615,7 +615,6 @@ export function Pow() {
             : type === 'post' || type === 'reply'
               ? type
               : `#${event.url.split('/').at(-1)}`,
-      context: isRepository(source) ? 'Repository activity from all contributors' : undefined,
     };
   });
   const loading = sources.some((s) => !results[s.key] || results[s.key].refreshing);
