@@ -8,7 +8,5 @@ const root = document.getElementById('root');
 if (!root) throw new Error('#root not found');
 
 createRoot(root).render(
-  <StrictMode>
-    {window.location.pathname.replace(/\/$/, '') === '/pow' ? <Pow /> : <App />}
-  </StrictMode>,
+  <StrictMode>{/^\/pow(?:\/|$)/.test(window.location.pathname) ? <Pow /> : <App />}</StrictMode>,
 );

@@ -3,6 +3,7 @@ import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
 import { EVENT_TYPE_META } from '../eventTypes';
 import { useSources } from './useSources';
+import { powParams, powUrl } from './url';
 import { useNip05Labels } from './useNip05Labels';
 import { useAccountDiscovery, type DiscoveredAccount } from './useAccountDiscovery';
 import {
@@ -22,7 +23,7 @@ const years = Array.from(
   { length: currentYear - FIRST_HISTORY_YEAR + 1 },
   (_, i) => currentYear - i,
 );
-const initial = new URLSearchParams(window.location.search);
+const initial = powParams(window.location.pathname, window.location.search);
 const hasSources = (params: URLSearchParams) =>
   ['p', 'gh', 'ngit', 'repo'].some((key) => params.has(key));
 const chipClass = (active = false) =>
@@ -414,7 +415,7 @@ export function Pow() {
         changed = true;
       }
       if (!changed) return;
-      history.replaceState(null, '', `/pow?${next}`);
+      history.replaceState(null, '', powUrl(next, location.pathname));
       setParams(next);
       setNpub(next.get('p') ?? '');
       setGh(next.getAll('gh').join(', '));
@@ -440,7 +441,7 @@ export function Pow() {
   }, []);
   useEffect(() => {
     const pop = () => {
-      const next = new URLSearchParams(location.search);
+      const next = powParams(location.pathname, location.search);
       setParams(next);
       setGh(next.getAll('gh').join(', '));
       setNpub(next.get('p') ?? '');
@@ -557,7 +558,7 @@ export function Pow() {
     const next = new URLSearchParams(params);
     if (value === null) next.delete('year');
     else next.set('year', String(value));
-    history.pushState(null, '', `/pow${next.size ? `?${next}` : ''}`);
+    history.pushState(null, '', powUrl(next, location.pathname));
     setParams(next);
     setDay('');
     setKind('all');
@@ -580,7 +581,7 @@ export function Pow() {
       .map((s) => s.trim())
       .filter(Boolean))
       next.append('repo', value);
-    history.pushState(null, '', `/pow${next.size ? `?${next}` : ''}`);
+    history.pushState(null, '', powUrl(next, location.pathname));
     setParams(next);
     setFilter('all');
     setKind('all');
@@ -871,7 +872,7 @@ export function Pow() {
       ) : !sources.length ? (
         <div className="text-zinc-500 px-2 py-8 text-sm">
           Enter a GitHub handle, npub, or NIP-05 address to load activity.{' '}
-          <a href="/pow?gh=dergigi" className="text-zinc-400">
+          <a href="/pow/dergigi" className="text-zinc-400">
             Try dergigi
           </a>
           .
