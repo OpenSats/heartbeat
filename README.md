@@ -194,7 +194,7 @@ Knobs (time window, page sizes) live at the top of
 ## Deploy
 
 Built for Vercel. Set `GITHUB_TOKEN` as an env var when GitHub repos are
-tracked; `vercel-build` runs `npm run fetch && npm run build`. For periodic
+tracked; `build:vercel` runs `npm run fetch && npm run build` once per deployment via `vercel.json`. For periodic
 refreshes, save a Vercel Deploy Hook URL as the `VERCEL_DEPLOY_HOOK_URL` repo
 secret and the included [`refresh.yml`](.github/workflows/refresh.yml)
 workflow pings it every 6 hours.
