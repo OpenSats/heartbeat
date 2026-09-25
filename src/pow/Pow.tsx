@@ -3,6 +3,7 @@ import { Timeline } from '../components/Timeline';
 import type { TimelineEvent } from '../components/EventRow';
 import { EVENT_TYPE_META } from '../eventTypes';
 import { useSources } from './useSources';
+import { useNip05Labels } from './useNip05Labels';
 import {
   activityRange,
   sourcePlatform,
@@ -37,10 +38,12 @@ const sourceColor = (source: Source) =>
 function SourceStatus({
   year,
   source,
+  displayLabel,
   onResult,
 }: {
   year: number | null;
   source: Source;
+  displayLabel: string;
   onResult: (key: string, result: SourceResult) => void;
 }) {
   const [result, setResult] = useState<SourceResult | null>(null);
@@ -145,7 +148,7 @@ function SourceStatus({
       <summary className="cursor-pointer hover:text-zinc-300 py-0.5">
         <span className="text-zinc-500">{source.kind}:</span>{' '}
         <span className={sourceColor(source)} title={source.label}>
-          {short(source.label)}
+          {short(displayLabel)}
         </span>{' '}
         <span className={status === 'unavailable' ? 'text-amber-400' : ''}>{status}</span>
         {result?.snapshot && <span> · {result.snapshot.events.length} events</span>}
@@ -338,6 +341,7 @@ export function Pow() {
   const [combinedHeatmap, setCombinedHeatmap] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const { sources, errors, pending: resolving } = useSources(params);
+  const displayName = useNip05Labels(sources.map((source) => source.label.split('/')[0]));
   const onResult = useMemo(
     () => (key: string, result: SourceResult) =>
       setPeriodResults((prev) => ({ ...prev, [periodKey]: { ...prev[periodKey], [key]: result } })),
@@ -390,7 +394,7 @@ export function Pow() {
       (kind === 'all' || event.type === kind) &&
       (!actor || event.actor === actor) &&
       (!repo || event.repo === repo) &&
-      `${event.title} ${event.repo ?? ''} ${event.actor}`
+      `${event.title} ${event.repo ?? ''} ${event.actor} ${displayName(event.actor)}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -419,6 +423,7 @@ export function Pow() {
           });
     return {
       ...event,
+      actorLabel: displayName(event.actor),
       url: event.url.replace('https://njump.me/', 'https://njump.to/'),
       type,
       meta,
@@ -680,7 +685,7 @@ export function Pow() {
               <div className="flex flex-wrap gap-1.5">
                 {actor && (
                   <button className={chipClass(true)} onClick={() => setActor('')}>
-                    dev: {short(actor)} ×
+                    dev: {short(displayName(actor))} ×
                   </button>
                 )}
                 {repo && (
@@ -696,6 +701,7 @@ export function Pow() {
                   key={`${periodKey}:${source.key}`}
                   year={year}
                   source={source}
+                  displayLabel={displayName(source.label)}
                   onResult={onResult}
                 />
               ))}
