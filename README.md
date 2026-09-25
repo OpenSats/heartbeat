@@ -24,6 +24,16 @@ observed signed profile only after its domain resolves back to the same npub.
 Root identifiers display as bare domains. Failed or mismatched checks keep the
 npub visible; filtering and activity cache keys continue to use the original key.
 
+Account discovery offers an **add** button for npubs in GitHub bios, website
+fields, or social links. These are references, not ownership proofs. In the other
+direction, NIP-39 `github:` claims are read from signed kind-10011 lists (with
+legacy kind-0 fallback) and offered only when a public, single-file gist has the
+claimed GitHub owner and the exact NIP-39 verification text for that npub.
+Profile READMEs and unproven GitHub mentions in Nostr bios are not scanned.
+The browser matches the evidence and adds accepted accounts to the URL. Public
+profiles and gists are cached independently at the CDN for one hour; discovery
+creates no database records or stored cross-account mappings.
+
 An `npub` in `p=` loads both text notes and ngit activity. Use `ngit=npub…`
 to load code activity alone. NIP-34 patches, PRs, PR updates, issues, NIP-22 code
 comments, status messages, repository announcements and ref updates appear in an
