@@ -181,11 +181,35 @@ function SourceStatus({
   );
 }
 
+const heatmapSourceColors = {
+  github: { color: 'emerald', label: 'GitHub' },
+  nostr: { color: 'violet', label: 'Nostr' },
+  ngit: { color: 'amber', label: 'ngit / GRASP' },
+} as const;
+type HeatmapPlatform = keyof typeof heatmapSourceColors;
+
+function blendedHeatColor(counts: Partial<Record<HeatmapPlatform, number>>, level: number) {
+  const shade = [900, 950, 800, 600, 400][level];
+  let color = 'var(--color-zinc-900)';
+  let total = 0;
+  for (const platform of Object.keys(heatmapSourceColors) as HeatmapPlatform[]) {
+    const count = counts[platform] ?? 0;
+    if (!count) continue;
+    const next = `var(--color-${heatmapSourceColors[platform].color}-${shade})`;
+    color = total
+      ? `color-mix(in srgb, ${color} ${(total / (total + count)) * 100}%, ${next})`
+      : next;
+    total += count;
+  }
+  return color;
+}
+
 function Heatmap({
   year,
   platform,
   filteredView,
   dates,
+  sourceDates = [],
   selected,
   onSelect,
   loading,
@@ -195,6 +219,7 @@ function Heatmap({
   platform: 'github' | 'nostr' | 'ngit' | 'combined';
   filteredView: boolean;
   dates: string[];
+  sourceDates?: { date: string; platform: HeatmapPlatform }[];
   selected: string;
   onSelect: (day: string) => void;
   loading: boolean;
@@ -202,7 +227,7 @@ function Heatmap({
 }) {
   const heatColors =
     platform === 'combined'
-      ? ['bg-zinc-900', 'bg-sky-950', 'bg-sky-800', 'bg-sky-600', 'bg-sky-400']
+      ? ['bg-zinc-900', 'bg-zinc-800', 'bg-zinc-600', 'bg-zinc-400', 'bg-zinc-200']
       : platform === 'github'
         ? ['bg-zinc-900', 'bg-emerald-950', 'bg-emerald-800', 'bg-emerald-600', 'bg-emerald-400']
         : platform === 'ngit'
@@ -210,6 +235,12 @@ function Heatmap({
           : ['bg-zinc-900', 'bg-violet-950', 'bg-violet-800', 'bg-violet-600', 'bg-violet-400'];
   const counts = new Map<string, number>();
   for (const date of dates) counts.set(date, (counts.get(date) ?? 0) + 1);
+  const sourceCounts = new Map<string, Partial<Record<HeatmapPlatform, number>>>();
+  for (const { date, platform } of sourceDates) {
+    const counts = sourceCounts.get(date) ?? {};
+    counts[platform] = (counts[platform] ?? 0) + 1;
+    sourceCounts.set(date, counts);
+  }
   const range = activityRange(year);
   const today = range.to;
   const end = Date.parse(`${range.to}T00:00:00Z`);
@@ -228,7 +259,7 @@ function Heatmap({
         <span
           className={
             platform === 'combined'
-              ? 'text-sky-400'
+              ? 'text-zinc-300'
               : platform === 'github'
                 ? 'text-emerald-400'
                 : platform === 'ngit'
@@ -285,21 +316,31 @@ function Heatmap({
               const count = counts.get(day) ?? 0;
               const level = count === 0 ? 0 : count < 3 ? 1 : count < 6 ? 2 : count < 12 ? 3 : 4;
               const complete = coverage(day);
-              const label = `${day}: ${count} ${filteredView ? 'matching ' : ''}fetched event${count === 1 ? '' : 's'}. ${complete ? 'GitHub search pages fetched for this day.' : 'Coverage incomplete or uncertain.'}`;
+              const breakdown =
+                platform === 'combined'
+                  ? Object.entries(sourceCounts.get(day) ?? {})
+                      .map(
+                        ([source, count]) =>
+                          `${heatmapSourceColors[source as HeatmapPlatform].label}: ${count}`,
+                      )
+                      .join(', ')
+                  : '';
+              const label = `${day}: ${count} ${filteredView ? 'matching ' : ''}fetched event${count === 1 ? '' : 's'}.${breakdown ? ` ${breakdown}.` : ''} ${complete ? 'GitHub search pages fetched for this day.' : 'Coverage incomplete or uncertain.'}`;
               return (
                 <button
                   key={day}
                   title={label}
                   aria-label={label}
                   aria-pressed={selected === day}
-                  style={
-                    !complete
-                      ? {
-                          backgroundImage:
-                            'repeating-linear-gradient(135deg, transparent 0 3px, #a1a1aa66 3px 4px)',
-                        }
-                      : undefined
-                  }
+                  style={{
+                    backgroundColor:
+                      platform === 'combined'
+                        ? blendedHeatColor(sourceCounts.get(day) ?? {}, level)
+                        : undefined,
+                    backgroundImage: !complete
+                      ? 'repeating-linear-gradient(135deg, transparent 0 3px, #a1a1aa66 3px 4px)'
+                      : undefined,
+                  }}
                   onClick={() => onSelect(selected === day ? '' : day)}
                   className={`h-3.5 w-3.5 rounded-[2px] ${heatColors[level]} ${selected === day ? 'outline outline-1 outline-zinc-100' : 'hover:outline hover:outline-1 hover:outline-zinc-500'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-white`}
                 />
@@ -307,6 +348,24 @@ function Heatmap({
             })}
           </div>
           <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-zinc-600">
+            {platform === 'combined' && (
+              <span className="mr-auto flex items-center gap-3">
+                {(Object.keys(heatmapSourceColors) as HeatmapPlatform[]).map((source) => (
+                  <span key={source} className="flex items-center gap-1">
+                    <span
+                      className="h-2.5 w-2.5 rounded-[2px]"
+                      style={{
+                        backgroundColor: `var(--color-${heatmapSourceColors[source].color}-400)`,
+                      }}
+                    />
+                    {heatmapSourceColors[source].label}
+                  </span>
+                ))}
+                <span title="Each source contributes to the color in proportion to its event count.">
+                  mixed days blend
+                </span>
+              </span>
+            )}
             <span className="mr-1">less</span>
             {heatColors.map((color) => (
               <span key={color} className={`h-2.5 w-2.5 rounded-[2px] ${color}`} />
@@ -735,6 +794,10 @@ export function Pow() {
                 platform="combined"
                 filteredView={kind !== 'all' || !!query || !!actor || !!repo}
                 dates={filtered.map(({ event }) => event.timestamp.slice(0, 10))}
+                sourceDates={filtered.map(({ event, source }) => ({
+                  date: event.timestamp.slice(0, 10),
+                  platform: sourcePlatform(source),
+                }))}
                 selected={day}
                 onSelect={setDay}
                 loading={heatmapSources.some(
