@@ -31,9 +31,6 @@ export function RelayInfo({
   const fetches = latestRelayFetches(
     relaySources.flatMap((source) => results[source.key]?.snapshot?.relayFetches ?? []),
   );
-  const missing = relaySources.some(
-    (source) => !results[source.key]?.snapshot?.relayFetches?.length,
-  );
   return (
     <details ref={ref} className="relative">
       <summary
@@ -88,15 +85,6 @@ export function RelayInfo({
             );
           })}
         </ul>
-        {missing && (
-          <p className="mt-2 text-zinc-500">
-            Some cached history has no recorded relay details yet.
-          </p>
-        )}
-        <p className="mt-3 border-t border-zinc-900 pt-2 text-zinc-600">
-          Dots describe cached fetch results. Counts are from each relay’s last fetch and may
-          overlap.
-        </p>
       </div>
     </details>
   );
