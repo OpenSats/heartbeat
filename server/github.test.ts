@@ -157,7 +157,7 @@ test('thread pagination checkpoints and repository context include all actors', 
   assert.equal(second.windows?.[0].discoveryLimited, false);
 });
 
-test('expanded GitHub caches are isolated from older deployments; Nostr keeps its cache', () => {
+test('expanded GitHub caches are isolated from older deployments; Nostr uses outbox caches', () => {
   assert.equal(
     sourceCacheKey(parseSource('github', 'target'), '2025-01'),
     'github:target:v4:2025-01',
@@ -170,7 +170,7 @@ test('expanded GitHub caches are isolated from older deployments; Nostr keeps it
     'nostr',
     'npub1dergggklka99wwrs92yz8wdjs952h2ux2ha2ed598ngwu9w7a6fsh9xzpc',
   );
-  assert.equal(sourceCacheKey(nostr, '2025-01'), `${nostr.key}:v3:2025-01`);
+  assert.equal(sourceCacheKey(nostr, '2025-01'), `${nostr.key}:v4:2025-01`);
 });
 
 test('a merge counts once even when its implicit close arrives on another page', () => {

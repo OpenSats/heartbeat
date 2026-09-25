@@ -204,6 +204,6 @@ export function matchesSource(source: Source, filter: string) {
 }
 
 export function sourceCacheKey(source: Source, month: string) {
-  const version = sourcePlatform(source) === 'github' ? 'v4' : 'v3';
+  const version = sourcePlatform(source) === 'ngit' ? 'v3' : 'v4';
   return `${source.key}:${version}:${month}`;
 }

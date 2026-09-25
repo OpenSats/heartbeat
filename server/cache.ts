@@ -34,7 +34,10 @@ export async function readCache(
   let snapshot = row?.snapshot ?? null;
   let fetchedAt = row?.fetched_at;
   // Display existing history immediately while the expanded collector fills v4.
-  if (!snapshot && (source.kind === 'github' || source.kind === 'repo')) {
+  if (
+    !snapshot &&
+    (source.kind === 'github' || source.kind === 'repo' || source.kind === 'nostr')
+  ) {
     const legacyKey = `${source.key}:v3:${month}`;
     const [legacy] =
       await sql`SELECT snapshot, fetched_at FROM pow_sources WHERE source_key = ${legacyKey}`;
