@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { collectGithub, threadActivities, type GithubRequest } from './github.js';
+import {
+  collectGithub,
+  dedupeGithubActions,
+  threadActivities,
+  type GithubRequest,
+} from './github.js';
 import {
   hasPending,
   parseSource,
@@ -166,4 +171,20 @@ test('expanded GitHub caches are isolated from older deployments; Nostr keeps it
     'npub1dergggklka99wwrs92yz8wdjs952h2ux2ha2ed598ngwu9w7a6fsh9xzpc',
   );
   assert.equal(sourceCacheKey(nostr, '2025-01'), `${nostr.key}:v3:2025-01`);
+});
+
+test('a merge counts once even when its implicit close arrives on another page', () => {
+  const merge = threadActivities(task, [
+    { id: 100, event: 'merged', actor: { login: 'maintainer' }, created_at: timestamp },
+  ]);
+  const close = threadActivities(task, [
+    { id: 101, event: 'closed', actor: { login: 'maintainer' }, created_at: timestamp },
+  ]);
+  const otherIssue = threadActivities({ ...task, number: 11 }, [
+    { id: 102, event: 'closed', actor: { login: 'maintainer' }, created_at: timestamp },
+  ]);
+  assert.deepEqual(
+    dedupeGithubActions([...close, ...merge, ...otherIssue]).map((e) => e.id),
+    ['github:status:100', 'github:status:102'],
+  );
 });

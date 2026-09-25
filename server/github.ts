@@ -157,6 +157,14 @@ async function threadPage(
   return page;
 }
 
+// A merge also emits an implicit close, sometimes on the next timeline page.
+export function dedupeGithubActions(events: Activity[]): Activity[] {
+  const key = (event: Activity) =>
+    `${event.url.split('#')[0].replace('/pull/', '/issues/')}:${Date.parse(event.timestamp)}:${event.actor.toLowerCase()}`;
+  const merges = new Set(events.filter((e) => e.type === 'status: merged').map(key));
+  return events.filter((event) => event.type !== 'status: closed' || !merges.has(key(event)));
+}
+
 export async function collectGithub(
   source: Source,
   bounds: { from: string; to: string },
@@ -313,7 +321,7 @@ export async function collectGithub(
   const exhaustive = !pending.length && !details.length && !incomplete;
   return {
     githubVersion: 4,
-    events: [...events.values()],
+    events: dedupeGithubActions([...events.values()]),
     pending,
     pendingGithub: details,
     githubThreads: [...threads],
