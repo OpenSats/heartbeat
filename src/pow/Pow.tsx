@@ -4,6 +4,7 @@ import type { TimelineEvent } from '../components/EventRow';
 import { EVENT_TYPE_META } from '../eventTypes';
 import { useSources } from './useSources';
 import { useNip05Labels } from './useNip05Labels';
+import { useAccountDiscovery } from './useAccountDiscovery';
 import {
   activityRange,
   sourcePlatform,
@@ -400,6 +401,7 @@ export function Pow() {
   const [combinedHeatmap, setCombinedHeatmap] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const { sources, errors, pending: resolving } = useSources(params);
+  const discoveredAccounts = useAccountDiscovery(sources);
   const displayName = useNip05Labels(sources.map((source) => source.label.split('/')[0]));
   const onResult = useMemo(
     () => (key: string, result: SourceResult) =>
@@ -668,6 +670,43 @@ export function Pow() {
             </div>
           </form>
         )}
+        {discoveredAccounts.map((account) => (
+          <div
+            key={`${account.parameter}:${account.value}`}
+            className="flex flex-wrap items-center gap-2 text-xs text-zinc-500"
+          >
+            <span>
+              {account.parameter === 'p' ? 'nostr' : 'github'}: {short(account.value)}
+            </span>
+            <a
+              href={account.evidenceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-zinc-300"
+            >
+              {account.verified ? 'NIP-39 proof' : 'listed on GitHub'} ·{' '}
+              {short(displayName(account.from))} ↗
+            </a>
+            <button
+              className={chipClass()}
+              onClick={() => {
+                const next = new URLSearchParams(params);
+                next.append(account.parameter, account.value);
+                history.pushState(null, '', `/pow?${next}`);
+                setParams(next);
+                setNpub(next.get('p') ?? '');
+                setGh(next.getAll('gh').join(', '));
+                setFilter('all');
+                setKind('all');
+                setActor('');
+                setRepo('');
+                setDay('');
+              }}
+            >
+              add
+            </button>
+          </div>
+        ))}
         {resolving.map((address) => (
           <p key={address} role="status" className="text-xs text-zinc-500">
             resolving {address}...

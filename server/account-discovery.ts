@@ -68,7 +68,9 @@ export async function accountEvidence(kind: string, value: string) {
     return {
       owner: gist.owner?.login ?? null,
       content:
-        files.length === 1 && !files[0].truncated ? (files[0].content ?? '').slice(0, 1000) : null,
+        files.length === 1 && !files[0].truncated && (files[0].content?.length ?? 0) <= 1000
+          ? (files[0].content ?? '')
+          : null,
     };
   }
   throw new Error('Unknown discovery source.');
