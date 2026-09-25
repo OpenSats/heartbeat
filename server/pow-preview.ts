@@ -101,8 +101,8 @@ export async function loadPreview(params: URLSearchParams): Promise<Preview> {
     if (!changed) break;
   }
   let label =
-    params.get('p') ||
     params.get('gh') ||
+    params.get('p') ||
     params.get('ngit') ||
     params.get('repo') ||
     'Public activity';
