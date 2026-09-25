@@ -1,5 +1,5 @@
 import { nip19 } from 'nostr-tools';
-import type { Source } from './model';
+import type { Source } from './model.js';
 
 export const NGIT_KINDS = [1617, 1618, 1619, 1621, 1630, 1631, 1632, 1633, 30617, 30618];
 export const NGIT_COMMENT_ROOTS = ['1617', '1618', '1621', '30617'];

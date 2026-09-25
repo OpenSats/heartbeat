@@ -1,5 +1,5 @@
 import { nip19, verifyEvent, type Event } from 'nostr-tools';
-import { parseSource } from './model';
+import { parseSource } from './model.js';
 
 export function profileNpubs(text: string) {
   const found = new Set<string>();

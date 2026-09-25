@@ -65,5 +65,6 @@
         }
       ]
     }
-  ]
+  ],
+  "buildCommand": "npm run build:vercel"
 }
