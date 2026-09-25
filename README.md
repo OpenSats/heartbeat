@@ -92,6 +92,18 @@ TODO: ngit/GRASP Git commit history
       must remain uncertain gaps. Git history alone cannot reconstruct push dates
       lost when relays replace older ref updates.
 
+TODO: NIP-66 relay health reports
+
+- [ ] Fetch and verify signed `kind:30166` reports from multiple trusted monitors.
+      Cache reports per relay and monitor, with timestamps and roughly hourly
+      refreshes. Treat stale or missing reports as unknown.
+- [ ] Show reported latency and access requirements in the relay panel, with the
+      monitor and report time, separately from our own cached fetch results.
+- [ ] Evaluate report reliability before using it to prioritize discovery and
+      fallback relays. Keep trying authors' advertised outbox relays; missing
+      reports or a single monitor's claims must not prevent connections.
+      Relay health must never imply complete activity history.
+
 The browser defaults to 365 days and queues all requested months up front. A year selector
 loads calendar years back to 2008, stored as `year=2025` in the view URL. Each
 platform has a separate heatmap, yearly total, and coverage indicators.
