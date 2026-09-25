@@ -7,6 +7,7 @@ export type TimelineEvent = Omit<Event, 'type'> & {
   type: string;
   meta?: EventTypeMeta;
   context?: string;
+  actorLabel?: string;
 };
 
 type Props = {
@@ -75,7 +76,7 @@ function EventRowImpl({ event, onSelectRepo, onSelectActor }: Props) {
         onSelect={onSelectActor}
         className="text-emerald-300/80 hover:text-emerald-200 min-w-0 max-w-[8rem] sm:max-w-[10rem]"
       >
-        {event.actor}
+        {event.actorLabel ?? event.actor}
       </FilterButton>
       {event.context && (
         <span className="text-xs text-amber-500/70" title={event.context}>
