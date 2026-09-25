@@ -2,10 +2,10 @@ import { neon } from '@neondatabase/serverless';
 import type { AccountEvidence } from '../src/pow/discoverAccounts.js';
 import { parseSource } from '../src/pow/model.js';
 import { queryRelay } from './relay.js';
-import { githubSlot, githubCooldown } from './rate-limit.js';
+import { githubDiscoverySlot, githubCooldown } from './rate-limit.js';
 
 async function github<T>(path: string): Promise<T> {
-  await githubSlot('core');
+  await githubDiscoverySlot();
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       Accept: 'application/vnd.github+json',

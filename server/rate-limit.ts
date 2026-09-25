@@ -28,6 +28,23 @@ export async function githubSlot(resource: string, waited = false): Promise<void
   }
 }
 
+// Reserve a near-future core slot so interactive discovery cannot be starved by backfills.
+// Long provider cooldowns remain untouched and are returned to the browser for retry.
+export async function githubDiscoverySlot(): Promise<void> {
+  const sql = neon(process.env.DATABASE_URL!);
+  const rows = await sql`
+    INSERT INTO pow_provider_limits (resource, next_at) VALUES ('core', now() + interval '200 milliseconds')
+    ON CONFLICT (resource) DO UPDATE SET next_at = GREATEST(pow_provider_limits.next_at, now()) + interval '200 milliseconds'
+    WHERE pow_provider_limits.next_at <= now() + interval '3 seconds'
+    RETURNING next_at - interval '200 milliseconds' AS ready_at`;
+  if (!rows.length) {
+    const [row] = await sql`SELECT next_at FROM pow_provider_limits WHERE resource = 'core'`;
+    throw new RetryLater(Math.max(3, Math.ceil((Date.parse(row.next_at) - Date.now()) / 1000)));
+  }
+  const delay = Date.parse(rows[0].ready_at) - Date.now();
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+}
+
 export async function githubCooldown(resource: string, response: Response) {
   const retry = Number(response.headers.get('retry-after'));
   const reset = Number(response.headers.get('x-ratelimit-reset')) * 1000;
