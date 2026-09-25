@@ -399,6 +399,11 @@ export function Pow() {
     {},
   );
   const year = selectedYear(params.get('year'));
+  const [yearCount, setYearCount] = useState(5);
+  const visibleYears = years.slice(
+    0,
+    Math.max(yearCount, year === null ? 0 : currentYear - year + 1),
+  );
   const periodKey = year === null ? 'recent' : String(year);
   const results = useMemo(() => periodResults[periodKey] ?? {}, [periodResults, periodKey]);
   const range = useMemo(() => activityRange(year), [year]);
@@ -753,7 +758,7 @@ export function Pow() {
               >
                 last 365 days
               </button>
-              {years.map((value) => (
+              {visibleYears.map((value) => (
                 <button
                   key={value}
                   aria-pressed={year === value}
@@ -763,6 +768,14 @@ export function Pow() {
                   {value}
                 </button>
               ))}
+              {visibleYears.length < years.length && (
+                <button
+                  className={chipClass()}
+                  onClick={() => setYearCount(Math.min(years.length, visibleYears.length + 5))}
+                >
+                  older years
+                </button>
+              )}
             </div>
             <label className="flex items-center gap-1.5">
               <span className="text-zinc-600 text-xs shrink-0 w-14">filter:</span>
