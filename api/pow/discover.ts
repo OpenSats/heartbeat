@@ -17,7 +17,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Object.keys(req.query).some((k) => !['kind', 'value', 'v'].includes(k))
     )
       throw new Error('Supply one source.');
-    if (req.query.v !== undefined && req.query.v !== '2') throw new Error('Invalid version.');
+    if (req.query.v !== undefined && !['2', '3'].includes(String(req.query.v)))
+      throw new Error('Invalid version.');
     if (kind === 'github' || kind === 'nostr') parseSource(kind, value);
     else if (kind !== 'gist' || !/^[a-f0-9]{1,64}$/i.test(value))
       throw new Error('Invalid source.');
