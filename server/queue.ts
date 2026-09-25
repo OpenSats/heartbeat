@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { QueueClient } from '@vercel/queue';
 import { claimRefresh, database, readCache, refresh } from './cache.js';
 import { RetryLater } from './rate-limit.js';
-import { hasPending, sourcePlatform, type Source } from '../src/pow/model.js';
+import { sourceCacheKey, hasPending, sourcePlatform, type Source } from '../src/pow/model.js';
 
 export const queue = new QueueClient({ region: 'iad1' });
 type Job = { source: Source; month: string; token: string };
 
 export async function enqueue(source: Source, month: string) {
   const sql = database();
-  const key = `${source.key}:v3:${month}`;
+  const key = sourceCacheKey(source, month);
   const token = randomUUID();
   // A short publishing lease recovers interrupted sends; workers extend it to the message TTL.
   const rows = await sql`
@@ -39,7 +39,7 @@ export async function enqueue(source: Source, month: string) {
 export const consume = queue.handleNodeCallback<Job>(
   async ({ source, month, token }, metadata) => {
     const sql = database();
-    const key = `${source.key}:v3:${month}`;
+    const key = sourceCacheKey(source, month);
     const [job] =
       await sql`SELECT job_token, failure_count FROM pow_sources WHERE source_key = ${key}`;
     if (job?.job_token !== token) return;

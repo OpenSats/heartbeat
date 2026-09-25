@@ -1,8 +1,8 @@
 import WebSocket from 'ws';
 import { collectNgit } from './ngit.js';
-import { githubSlot, githubCooldown, RetryLater } from './rate-limit.js';
+import { collectGithub } from './github.js';
 import { nip19, verifyEvent, type Event as NostrEvent } from 'nostr-tools';
-import type { Activity, SearchTask, Snapshot, Source } from '../src/pow/model.js';
+import type { Snapshot, Source } from '../src/pow/model.js';
 
 export function monthBounds(month: string) {
   const from = new Date(`${month}-01T00:00:00Z`);
@@ -11,141 +11,6 @@ export function monthBounds(month: string) {
   return {
     from: from.toISOString(),
     to: new Date(Math.min(next.getTime() - 1, Date.now())).toISOString(),
-  };
-}
-async function github<T>(path: string): Promise<T> {
-  const resource = path.startsWith('/search/') ? 'search' : 'core';
-  await githubSlot(resource);
-  const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
-    },
-    signal: AbortSignal.timeout(12000),
-    redirect: 'error',
-  });
-  if (response.status === 403 || response.status === 429)
-    throw await githubCooldown(resource, response);
-  if (response.headers.get('x-ratelimit-remaining') === '0')
-    await githubCooldown(resource, response);
-  if (!response.ok)
-    throw new Error(
-      response.status === 404
-        ? 'GitHub account or public repository not found.'
-        : response.status === 403 || response.status === 429
-          ? 'GitHub rate limit reached. Backfill will retry shortly.'
-          : `GitHub is unavailable (${response.status}).`,
-    );
-  return response.json() as Promise<T>;
-}
-type Commit = {
-  html_url: string;
-  author: { login: string } | null;
-  commit: { message: string; author: { name: string; date: string } };
-  repository: { full_name: string; private: boolean };
-};
-type Issue = {
-  title: string;
-  html_url: string;
-  created_at: string;
-  user: { login: string };
-  repository_url: string;
-  pull_request?: unknown;
-};
-type Search<T> = { items: T[]; total_count: number; incomplete_results: boolean };
-
-async function collectGithub(
-  source: Source,
-  month: string,
-  previous?: Snapshot | null,
-): Promise<Snapshot> {
-  const bounds = previous?.pending?.length ? previous.windows![0] : monthBounds(month);
-  const resuming = !!previous?.pending?.length;
-  if (!resuming) {
-    if (source.kind === 'repo') {
-      const repo = await github<{ private: boolean }>(`/repos/${source.value}`);
-      if (repo.private) throw new Error('Only public repositories are supported.');
-    } else await github(`/users/${source.value}`);
-  }
-  const pending: SearchTask[] = resuming
-    ? [...previous!.pending!]
-    : [
-        { endpoint: 'commits', from: bounds.from, to: bounds.to, page: 1 },
-        { endpoint: 'issues', from: bounds.from, to: bounds.to, page: 1 },
-      ];
-  const events = new Map<string, Activity>(
-    (resuming ? previous!.events : []).map((event) => [event.id, event]),
-  );
-  let incomplete = resuming ? (previous!.searchIncomplete ?? false) : false;
-  const deadline = Date.now() + 25000;
-  for (let requests = 0; pending.length && requests < 5 && Date.now() < deadline; requests++) {
-    const task = pending[0];
-    const field = task.endpoint === 'commits' ? 'author-date' : 'created';
-    const query = `${source.kind === 'repo' ? 'repo' : 'author'}:${source.value} is:public ${field}:${task.from}..${task.to}`;
-    let page: Search<Commit | Issue>;
-    try {
-      page = await github<Search<Commit | Issue>>(
-        `/search/${task.endpoint}?q=${encodeURIComponent(query)}&sort=${field}&order=desc&per_page=100&page=${task.page}`,
-      );
-    } catch (error) {
-      // Save pages already fetched before waiting for the next provider slot.
-      if (error instanceof RetryLater && requests > 0) break;
-      throw error;
-    }
-    pending.shift();
-    if (
-      task.page === 1 &&
-      page.total_count > 1000 &&
-      Date.parse(task.to) - Date.parse(task.from) > 1000
-    ) {
-      const midpoint = Math.floor((Date.parse(task.from) + Date.parse(task.to)) / 2000) * 1000;
-      pending.unshift(
-        { ...task, to: new Date(midpoint).toISOString() },
-        { ...task, from: new Date(midpoint + 1000).toISOString() },
-      );
-      continue;
-    }
-    incomplete ||= page.incomplete_results || page.total_count > 1000;
-    for (const item of page.items) {
-      if (task.endpoint === 'commits') {
-        const c = item as Commit;
-        if (c.repository.private) continue;
-        events.set(c.html_url, {
-          id: c.html_url,
-          timestamp: c.commit.author.date,
-          type: 'commit',
-          title: c.commit.message.split('\n')[0],
-          url: c.html_url,
-          actor: c.author?.login ?? c.commit.author.name,
-          repo: c.repository.full_name,
-        });
-      } else {
-        const i = item as Issue;
-        events.set(i.html_url, {
-          id: i.html_url,
-          timestamp: i.created_at,
-          type: i.pull_request ? 'pull request' : 'issue',
-          title: i.title,
-          url: i.html_url,
-          actor: i.user.login,
-          repo: i.repository_url.split('/repos/')[1],
-        });
-      }
-    }
-    const total = task.total ?? page.total_count;
-    const seen = (task.seen ?? 0) + page.items.length;
-    if (seen < Math.min(total, 1000) && task.page < 10 && page.items.length)
-      pending.unshift({ ...task, page: task.page + 1, total, seen });
-    else if (seen < total) incomplete = true;
-  }
-  const exhaustive = !pending.length && !incomplete;
-  return {
-    events: [...events.values()],
-    pending,
-    searchIncomplete: incomplete,
-    profileUrl: `https://github.com/${source.value}`,
-    coverage: `${month}: ${pending.length ? 'Backfill in progress' : exhaustive ? 'All returned search pages fetched' : 'GitHub returned incomplete results'}. Public authored commits, issues and PRs only; reviews and merge actions are excluded. GitHub indexing can omit activity.${source.kind === 'repo' ? ' Repository context includes all contributors.' : ''}`,
-    windows: [{ from: bounds.from, to: bounds.to, exhaustive, basis: 'github-search' }],
   };
 }
 const RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'];
@@ -241,7 +106,7 @@ export async function collect(
 ): Promise<Snapshot> {
   if (source.kind === 'ngit' || source.kind === 'grasp')
     return collectNgit(source, month, previous, monthBounds(month));
-  if (source.kind !== 'nostr') return collectGithub(source, month, previous);
+  if (source.kind !== 'nostr') return collectGithub(source, monthBounds(month), previous);
   const results = await Promise.allSettled(
     RELAYS.map((url) => relayEvents(url, source.value, month)),
   );

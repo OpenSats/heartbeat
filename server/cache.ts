@@ -2,7 +2,13 @@ import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import { RetryLater } from './rate-limit.js';
 import { collect, monthBounds } from './collect.js';
-import { hasPending, type Snapshot, type Source, type SourceResult } from '../src/pow/model.js';
+import {
+  sourceCacheKey,
+  hasPending,
+  type Snapshot,
+  type Source,
+  type SourceResult,
+} from '../src/pow/model.js';
 
 export function database() {
   if (!process.env.DATABASE_URL) throw new Error('Database is not configured.');
@@ -21,10 +27,23 @@ export async function readCache(
   month: string,
 ): Promise<SourceResult & { retry: boolean }> {
   const sql = database();
-  const key = `${source.key}:v3:${month}`;
+  const key = sourceCacheKey(source, month);
   const rows =
     await sql`SELECT snapshot, fetched_at, retry_at, lease_until, queued_until, error FROM pow_sources WHERE source_key = ${key}`;
   const row = rows[0] as Row | undefined;
+  let snapshot = row?.snapshot ?? null;
+  let fetchedAt = row?.fetched_at;
+  // Display existing history immediately while the expanded collector fills v4.
+  if (!snapshot && (source.kind === 'github' || source.kind === 'repo')) {
+    const legacyKey = `${source.key}:v3:${month}`;
+    const [legacy] =
+      await sql`SELECT snapshot, fetched_at FROM pow_sources WHERE source_key = ${legacyKey}`;
+    if (legacy?.snapshot) {
+      const old = legacy.snapshot as Snapshot;
+      snapshot = { ...old, windows: old.windows?.map((w) => ({ ...w, exhaustive: false })) };
+      fetchedAt = legacy.fetched_at;
+    }
+  }
   const now = Date.now();
   const closedMonthNeedsRefresh =
     month !== new Date().toISOString().slice(0, 7) &&
@@ -40,8 +59,8 @@ export async function readCache(
           : Infinity;
   return {
     source,
-    snapshot: row?.snapshot ?? null,
-    fetchedAt: row?.fetched_at ? new Date(row.fetched_at).toISOString() : null,
+    snapshot,
+    fetchedAt: fetchedAt ? new Date(fetchedAt).toISOString() : null,
     refreshing:
       (!!row?.lease_until && Date.parse(row.lease_until) > now) ||
       (!!row?.queued_until && Date.parse(row.queued_until) > now),
@@ -53,7 +72,7 @@ export async function readCache(
 }
 export async function claimRefresh(source: Source, month: string) {
   const sql = database();
-  const key = `${source.key}:v3:${month}`;
+  const key = sourceCacheKey(source, month);
   const closedMonth = month !== new Date().toISOString().slice(0, 7);
   const end = monthBounds(month).to;
   const token = randomUUID();
@@ -62,13 +81,13 @@ export async function claimRefresh(source: Source, month: string) {
     ON CONFLICT (source_key) DO UPDATE SET lease_token = ${token}, lease_until = now() + interval '90 seconds'
     WHERE (pow_sources.lease_until IS NULL OR pow_sources.lease_until < now())
       AND (pow_sources.retry_at IS NULL OR pow_sources.retry_at < now())
-      AND (pow_sources.fetched_at IS NULL OR (${closedMonth} AND pow_sources.snapshot #>> '{windows,0,to}' < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingRelays', '[]'::jsonb)) > 0 OR (pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' AND pow_sources.fetched_at < now() - interval '1 hour') OR (NOT ${closedMonth} AND pow_sources.fetched_at < now() - interval '24 hours'))
+      AND (pow_sources.fetched_at IS NULL OR (${closedMonth} AND pow_sources.snapshot #>> '{windows,0,to}' < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingGithub', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingRelays', '[]'::jsonb)) > 0 OR (pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' AND pow_sources.fetched_at < now() - interval '1 hour') OR (NOT ${closedMonth} AND pow_sources.fetched_at < now() - interval '24 hours'))
     RETURNING source_key`;
   return lease.length ? token : null;
 }
 export async function refresh(source: Source, token: string, month: string) {
   const sql = database();
-  const key = `${source.key}:v3:${month}`;
+  const key = sourceCacheKey(source, month);
   try {
     const previous = await readCache(source, month);
     const snapshot = await collect(source, month, previous.snapshot);
@@ -84,6 +103,8 @@ export async function refresh(source: Source, token: string, month: string) {
       snapshot.windows = snapshot.windows?.map((window) => ({ ...window, exhaustive: false }));
       snapshot.pending = [];
       snapshot.pendingRelays = [];
+      snapshot.pendingGithub = [];
+      snapshot.githubThreads = [];
       snapshot.searchIncomplete = true;
       snapshot.coverage +=
         ' This unusually busy month exceeded the response size limit; coverage is incomplete.';

@@ -84,7 +84,14 @@ export async function renderPreview(preview: Preview, avatar?: string) {
     count: preview.days.filter((d) => d.platform === platform).reduce((n, d) => n + d.count, 0),
   }));
   const incomplete = preview.unavailable || preview.cachedMonths < preview.expectedMonths;
-  const uncertainty = preview.sources.some((s) => sourcePlatform(s) !== 'github');
+  const relayUncertainty = preview.sources.some((s) => sourcePlatform(s) !== 'github');
+  const discoveryUncertainty = preview.windows.some((row) =>
+    row.windows?.some((w) => w.discoveryLimited),
+  );
+  const uncertainty = relayUncertainty || discoveryUncertainty;
+  const coverageLabel = relayUncertainty
+    ? 'Relay coverage uncertain'
+    : 'Activity discovery uncertain';
   const partial = preview.windows.some(
     (row) => !row.windows?.length || row.windows.some((w) => !w.exhaustive),
   );
@@ -95,7 +102,7 @@ export async function renderPreview(preview: Preview, avatar?: string) {
       : incomplete || partial
         ? 'History partially cached'
         : uncertainty
-          ? 'Relay coverage uncertain'
+          ? coverageLabel
           : 'Cached public activity';
   const chart = heatmap(preview);
   const card = h(
@@ -224,7 +231,7 @@ export async function renderPreview(preview: Preview, avatar?: string) {
       h(
         'span',
         null,
-        `${status}${uncertainty && status !== 'Relay coverage uncertain' ? ' · relay coverage uncertain' : ''}`,
+        `${status}${uncertainty && status !== coverageLabel ? ` · ${coverageLabel.toLowerCase()}` : ''}`,
       ),
       h('span', null, `${preview.range.from} / ${preview.range.to}`),
     ),

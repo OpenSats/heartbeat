@@ -25,15 +25,15 @@ const typeGroups: Record<string, string> = {
   'PR update': 'PRs',
   issue: 'issues',
   'code comment': 'comments',
+  comment: 'comments',
+  review: 'reviews',
   repository: 'repo updates',
   'refs update': 'repo updates',
   post: 'posts',
   reply: 'replies',
 };
 const typeFilter = (type: string) =>
-  /^status: (open|closed|draft|resolved)$/.test(type)
-    ? 'status changes'
-    : (typeGroups[type] ?? type);
+  type.startsWith('status: ') ? 'status changes' : (typeGroups[type] ?? type);
 
 const currentYear = new Date().getUTCFullYear();
 const years = Array.from(
@@ -96,7 +96,7 @@ function SourceStatus({
               events: [...activities.values()],
               windows,
               profileUrl: snapshots[0].profileUrl.replace('https://njump.me/', 'https://njump.to/'),
-              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from public relays. Relays can omit history, so empty days remain uncertain.' : sourcePlatform(source) === 'ngit' ? 'Signed patches, PRs, issues, code comments, status messages and repository updates. Ref updates are not individual commits. Relays may omit history or replace older state.' : 'Public authored commits, issues and PRs. Reviews and merge actions are excluded. GitHub indexing can omit activity.'}${isRepository(source) ? ' Repository context includes all contributors.' : ''}${source.kind === 'grasp' ? ' Comments and status messages without repository tags may be missing.' : ''}`,
+              coverage: `${snapshots.length}/${months.length} months fetched. ${source.kind === 'nostr' ? 'Signed text notes from public relays. Relays can omit history, so empty days remain uncertain.' : sourcePlatform(source) === 'ngit' ? 'Signed patches, PRs, issues, code comments, status messages and repository updates. Ref updates are not individual commits. Relays may omit history or replace older state.' : 'Public commits, issues, PRs, comments, reviews and status changes. Cross-repository discovery and GitHub indexing can omit activity.'}${isRepository(source) ? ' Repository context includes all contributors.' : ''}${source.kind === 'grasp' ? ' Comments and status messages without repository tags may be missing.' : ''}`,
             }
           : null,
         fetchedAt:
@@ -530,7 +530,7 @@ export function Pow() {
                   : type === 'code comment'
                     ? '↳'
                     : '·',
-            colorClass: 'text-amber-400',
+            colorClass: sourcePlatform(source) === 'github' ? 'text-emerald-400' : 'text-amber-400',
           });
     return {
       ...event,
@@ -567,7 +567,11 @@ export function Pow() {
         (s) =>
           sourcePlatform(s) === 'github' &&
           results[s.key]?.snapshot?.windows?.some(
-            (w) => w.exhaustive && Date.parse(w.from) <= from && Date.parse(w.to) >= to,
+            (w) =>
+              w.exhaustive &&
+              !w.discoveryLimited &&
+              Date.parse(w.from) <= from &&
+              Date.parse(w.to) >= to,
           ),
       )
     );
@@ -899,7 +903,7 @@ export function Pow() {
           <p className="px-3 py-2 text-[10px] text-zinc-600 border-b border-zinc-900">
             {heatmapPlatforms.some((platform) => platform !== 'github')
               ? 'Striped cells reflect incomplete or uncertain relay coverage. An empty day does not confirm inactivity.'
-              : 'Striped cells are incomplete. Plain empty cells have no fetched GitHub events matching the current filters.'}
+              : 'Striped cells have incomplete history or uncertain discovery. An empty day does not confirm inactivity.'}
           </p>
         </div>
       )}

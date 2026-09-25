@@ -8,6 +8,7 @@ import {
   selectedYear,
   sourcesFromUrl,
   sourcePlatform,
+  sourceCacheKey,
   type IdentityResolution,
   type Source,
   type CoverageWindow,
@@ -126,7 +127,7 @@ export async function loadPreview(params: URLSearchParams): Promise<Preview> {
   const avatar =
     params.has('gh') && !params.has('p') ? (gh?.avatar ?? picture) : (picture ?? gh?.avatar);
   const months = historyMonths(year);
-  const keys = sources.flatMap((s) => months.map((month) => `${s.key}:v3:${month}`));
+  const keys = sources.flatMap((s) => months.map((month) => sourceCacheKey(s, month)));
   const result: Preview = {
     label,
     avatar,
@@ -145,8 +146,13 @@ export async function loadPreview(params: URLSearchParams): Promise<Preview> {
     // Aggregate in Postgres so an image never downloads entire event histories.
     const rows = await sql`
       WITH cached AS (
-        SELECT source_key, snapshot FROM pow_sources
-        WHERE source_key = ANY(${keys}::text[]) AND snapshot IS NOT NULL
+        SELECT wanted.source_key,
+          CASE WHEN current.snapshot IS NOT NULL THEN current.snapshot
+               ELSE legacy.snapshot || '{"windows": null}'::jsonb END AS snapshot
+        FROM unnest(${keys}::text[]) AS wanted(source_key)
+        LEFT JOIN pow_sources current ON current.source_key = wanted.source_key
+        LEFT JOIN pow_sources legacy ON legacy.source_key = replace(wanted.source_key, ':v4:', ':v3:')
+        WHERE current.snapshot IS NOT NULL OR legacy.snapshot IS NOT NULL
       ), unique_events AS (
         SELECT DISTINCT ON (e->>'id') source_key, e->>'timestamp' AS timestamp
         FROM cached, jsonb_array_elements(snapshot->'events') e
@@ -178,10 +184,11 @@ export function dayCovered(preview: Preview, date: string) {
         sourcePlatform(source) === 'github' &&
         preview.windows.some(
           (row) =>
-            row.source_key === `${source.key}:v3:${date.slice(0, 7)}` &&
+            row.source_key === sourceCacheKey(source, date.slice(0, 7)) &&
             row.windows?.some(
               (w) =>
                 w.exhaustive &&
+                !w.discoveryLimited &&
                 Date.parse(w.from) <= from &&
                 Date.parse(w.to) >= from + 86400000 - 1,
             ),

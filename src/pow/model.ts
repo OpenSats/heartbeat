@@ -22,9 +22,11 @@ export type CoverageWindow = {
   to: string;
   exhaustive: boolean;
   basis: 'github-search' | 'relay';
+  discoveryLimited?: boolean;
 };
 export type SearchTask = {
   endpoint: 'commits' | 'issues';
+  mode?: 'created' | 'involved' | 'reviewed' | 'updated';
   from: string;
   to: string;
   page: number;
@@ -32,7 +34,17 @@ export type SearchTask = {
   seen?: number;
 };
 export type RelayTask = { url: string; filters: Filter[]; until: number; failures?: number };
+export type GithubThreadTask = {
+  repo: string;
+  number: number;
+  title: string;
+  endpoint: 'timeline' | 'reviews' | 'review-comments';
+  page: number;
+};
 export type Snapshot = {
+  githubVersion?: number;
+  pendingGithub?: GithubThreadTask[];
+  githubThreads?: string[];
   pendingRelays?: RelayTask[];
   relayIncomplete?: boolean;
   pending?: SearchTask[];
@@ -168,7 +180,11 @@ export function sourcesFromUrl(
 }
 
 export function hasPending(snapshot: Snapshot | null | undefined) {
-  return !!(snapshot?.pending?.length || snapshot?.pendingRelays?.length);
+  return !!(
+    snapshot?.pending?.length ||
+    snapshot?.pendingGithub?.length ||
+    snapshot?.pendingRelays?.length
+  );
 }
 export function sourcePlatform(source: Source): 'github' | 'nostr' | 'ngit' {
   return source.kind === 'nostr'
@@ -185,4 +201,9 @@ export function matchesSource(source: Source, filter: string) {
     filter === 'all' ||
     (filter === 'repo' ? isRepository(source) : sourcePlatform(source) === filter)
   );
+}
+
+export function sourceCacheKey(source: Source, month: string) {
+  const version = sourcePlatform(source) === 'github' ? 'v4' : 'v3';
+  return `${source.key}:${version}:${month}`;
 }
