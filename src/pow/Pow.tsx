@@ -496,7 +496,6 @@ export function Pow() {
   const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
   const [combinedHeatmap, setCombinedHeatmap] = useState(true);
-  const [showExamples, setShowExamples] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const {
     sources,
@@ -1029,17 +1028,9 @@ export function Pow() {
           <a href="/pow/fiatjaf" className="text-zinc-400 hover:text-zinc-200">
             Try fiatjaf
           </a>
-          <button
-            type="button"
-            className={`${chipClass(showExamples)} ml-3`}
-            aria-expanded={showExamples}
-            aria-controls="pow-examples"
-            onClick={() => setShowExamples((shown) => !shown)}
-          >
-            {showExamples ? 'fewer examples' : 'more examples'}
-          </button>
-          {showExamples && (
-            <ul id="pow-examples" className="mt-3 space-y-1 text-xs">
+          <details className="mt-2 text-xs text-zinc-600">
+            <summary className="cursor-pointer hover:text-zinc-300 py-0.5">more examples</summary>
+            <ul className="pl-4 py-1 space-y-1">
               {landingExamples.map((path) => (
                 <li key={path}>
                   <a href={path} className="text-zinc-400 hover:text-zinc-200 break-all">
@@ -1048,7 +1039,7 @@ export function Pow() {
                 </li>
               ))}
             </ul>
-          )}
+          </details>
         </div>
       ) : loading && !visible.length ? (
         <div className="text-zinc-500 px-2 py-8">loading...</div>
