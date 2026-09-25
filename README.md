@@ -12,6 +12,14 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
+`p=` and `ngit=` also accept NIP-05 addresses, such as `dergigi.com`,
+`fiatjaf.com`, or `sync@nostr.boutique`. Bare domains resolve the `_` name.
+The browser resolves each address independently through `/api/pow/resolve`, then
+loads activity under the resulting npub. Human-readable addresses stay in the
+page URL. Successful public lookups are cached at the CDN for one hour and in
+the browser HTTP cache for five minutes; no identity directory is stored in the
+database. Lookups use HTTPS, reject redirects, and allow only public IP addresses.
+
 An `npub` in `p=` loads both text notes and ngit activity. Use `ngit=npub…`
 to load code activity alone. NIP-34 patches, PRs, PR updates, issues, NIP-22 code
 comments, status messages, repository announcements and ref updates appear in an
