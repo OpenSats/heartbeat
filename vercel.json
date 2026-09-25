@@ -34,6 +34,14 @@
     {
       "source": "/pow/",
       "destination": "/index.html"
+    },
+    {
+      "source": "/pow/:person",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pow/:person/",
+      "destination": "/index.html"
     }
   ],
   "headers": [
