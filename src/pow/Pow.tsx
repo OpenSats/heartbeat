@@ -484,7 +484,7 @@ export function Pow() {
   const [repo, setRepo] = useState('');
   const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
-  const [combinedHeatmap, setCombinedHeatmap] = useState(false);
+  const [combinedHeatmap, setCombinedHeatmap] = useState(true);
   const barRef = useRef<HTMLDivElement>(null);
   const {
     sources,
