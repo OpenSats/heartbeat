@@ -18,6 +18,9 @@ import {
   type SourceResult,
 } from './model';
 
+const typeFilter = (type: string) =>
+  /^status: (open|closed|draft|resolved)$/.test(type) ? 'status changes' : type;
+
 const currentYear = new Date().getUTCFullYear();
 const years = Array.from(
   { length: currentYear - FIRST_HISTORY_YEAR + 1 },
@@ -483,10 +486,10 @@ export function Pow() {
     }
     return [...all.values()].sort((a, b) => b.event.timestamp.localeCompare(a.event.timestamp));
   }, [sources, results, filter, range]);
-  const types = [...new Set(events.map(({ event }) => event.type))].sort();
+  const types = [...new Set(events.map(({ event }) => typeFilter(event.type)))].sort();
   const filtered = events.filter(
     ({ event }) =>
-      (kind === 'all' || event.type === kind) &&
+      (kind === 'all' || typeFilter(event.type) === kind) &&
       (!repo || event.repo === repo) &&
       `${event.title} ${event.repo ?? ''} ${event.actor} ${displayName(event.actor)}`
         .toLowerCase()
@@ -517,6 +520,10 @@ export function Pow() {
           });
     return {
       ...event,
+      title:
+        typeFilter(event.type) === 'status changes' && event.title !== event.type
+          ? `${event.type} · ${event.title}`
+          : event.title,
       actorLabel: displayName(event.actor),
       url: event.url.replace('https://njump.me/', 'https://njump.to/'),
       type,
@@ -558,7 +565,8 @@ export function Pow() {
       ) &&
       (kind === 'all' ||
         events.some(
-          ({ event, source }) => sourcePlatform(source) === platform && event.type === kind,
+          ({ event, source }) =>
+            sourcePlatform(source) === platform && typeFilter(event.type) === kind,
         )),
   );
   const heatmapSources = sources.filter(
