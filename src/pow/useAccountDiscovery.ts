@@ -23,16 +23,31 @@ export function useAccountDiscovery(
   useEffect(() => {
     const controller = new AbortController();
     const inputs: { kind: string; value: string }[] = JSON.parse(inputKey);
+    const pause = (seconds: number) =>
+      new Promise<void>((resolve, reject) => {
+        const abort = () => {
+          clearTimeout(timer);
+          reject(new Error('Discovery cancelled.'));
+        };
+        const timer = setTimeout(() => {
+          controller.signal.removeEventListener('abort', abort);
+          resolve();
+        }, seconds * 1000);
+        controller.signal.addEventListener('abort', abort, { once: true });
+        if (controller.signal.aborted) abort();
+      });
     const read = async (kind: string, value: string) => {
-      const response = await fetch(
-        `/api/pow/discover?${new URLSearchParams({ kind, value, v: '3' })}`,
-        {
-          signal: controller.signal,
-          referrerPolicy: 'no-referrer',
-        },
-      );
-      if (!response.ok) throw new Error('Discovery unavailable.');
-      return response.json();
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const response = await fetch(
+          `/api/pow/discover?${new URLSearchParams({ kind, value, v: '3' })}`,
+          { signal: controller.signal, referrerPolicy: 'no-referrer' },
+        );
+        if (response.ok) return response.json();
+        if (![429, 503].includes(response.status) || attempt === 2) break;
+        const delay = Number(response.headers.get('Retry-After')) || 30;
+        await pause(Math.max(1, delay));
+      }
+      throw new Error('Discovery unavailable.');
     };
     const resolve = async (address: string) => {
       const response = await fetch(`/api/pow/resolve?${new URLSearchParams({ address })}`, {

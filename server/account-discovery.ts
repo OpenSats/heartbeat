@@ -1,3 +1,5 @@
+import { neon } from '@neondatabase/serverless';
+import type { AccountEvidence } from '../src/pow/discoverAccounts.js';
 import { parseSource } from '../src/pow/model.js';
 import { queryRelay } from './relay.js';
 import { githubSlot, githubCooldown } from './rate-limit.js';
@@ -23,25 +25,36 @@ async function github<T>(path: string): Promise<T> {
 export async function accountEvidence(kind: string, value: string) {
   if (kind === 'github') {
     const source = parseSource('github', value);
-    const profile = await github<{
-      login: string;
-      bio: string | null;
-      blog: string | null;
-      avatar_url: string;
-    }>(`/users/${source.value}`);
-    let social: { url: string }[] = [];
+    const sql = neon(process.env.DATABASE_URL!);
+    const key = `${source.key}:profile:v1`;
+    const [cached] =
+      await sql`SELECT snapshot, fetched_at FROM pow_sources WHERE source_key = ${key}`;
+    const age = cached ? Date.now() - Date.parse(cached.fetched_at) : Infinity;
+    if (cached?.snapshot && age < 3600000) return cached.snapshot as AccountEvidence;
     try {
-      social = await github(`/users/${source.value}/social_accounts`);
-    } catch {
-      /* Profile bio still usable. */
+      const profile = await github<{
+        login: string;
+        bio: string | null;
+        blog: string | null;
+        avatar_url: string;
+      }>(`/users/${source.value}`);
+      // Social links are part of discovery. A failed fetch must not become a cached empty list.
+      const social = await github<{ url: string }[]>(`/users/${source.value}/social_accounts`);
+      const evidence: AccountEvidence = {
+        login: profile.login,
+        avatar: profile.avatar_url,
+        bio: profile.bio,
+        blog: profile.blog,
+        social: social.map(({ url }) => url).slice(0, 20),
+      };
+      await sql`INSERT INTO pow_sources (source_key, snapshot, fetched_at) VALUES (${key}, ${JSON.stringify(evidence)}::jsonb, now())
+        ON CONFLICT (source_key) DO UPDATE SET snapshot = EXCLUDED.snapshot, fetched_at = now()`;
+      return evidence;
+    } catch (error) {
+      // Reuse the public source document during short outages without extending its lifetime.
+      if (cached?.snapshot && age < 86400000) return cached.snapshot as AccountEvidence;
+      throw error;
     }
-    return {
-      login: profile.login,
-      avatar: profile.avatar_url,
-      bio: profile.bio,
-      blog: profile.blog,
-      social: social.map(({ url }) => url).slice(0, 20),
-    };
   }
   if (kind === 'nostr') {
     const source = parseSource('nostr', value);

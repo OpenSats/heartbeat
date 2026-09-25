@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { parseSource } from '../../src/pow/model.js';
+import { RetryLater } from '../../server/rate-limit.js';
 import { accountEvidence } from '../../server/account-discovery.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -29,7 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await accountEvidence(kind as string, value as string);
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=3600');
     return res.status(200).json(result);
-  } catch {
+  } catch (error) {
+    res.setHeader('Retry-After', error instanceof RetryLater ? error.afterSeconds : 30);
     return res.status(503).json({ error: 'Account discovery is temporarily unavailable.' });
   }
 }
