@@ -1,18 +1,28 @@
 import { database } from './cache.js';
 import { RetryLater } from './rate-limit.js';
 
-export function powGithubToken() {
+export function powGithubAuthorization() {
+  const clientId = process.env.POW_GITHUB_CLIENT_ID;
+  const clientSecret = process.env.POW_GITHUB_CLIENT_SECRET;
+  if (clientId || clientSecret) {
+    if (!clientId || !clientSecret)
+      throw new RetryLater(
+        3600,
+        'GitHub collection is paused: incomplete PoW OAuth App configuration.',
+      );
+    return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+  }
   const token = process.env.POW_GITHUB_TOKEN;
   if (!token || token === process.env.GITHUB_TOKEN)
     throw new RetryLater(
       3600,
       'GitHub collection is paused until a separate PoW credential is configured.',
     );
-  return token;
+  return `Bearer ${token}`;
 }
 
 export async function reserveGithubRequest(resource: string, path: string) {
-  const token = powGithubToken();
+  const authorization = powGithubAuthorization();
   const sql = database();
   const [control] =
     await sql`SELECT enabled, hourly_limit, core_reserve, search_reserve FROM pow_github_control WHERE id = 1`;
@@ -38,19 +48,20 @@ export async function reserveGithubRequest(resource: string, path: string) {
       ? 'profiles'
       : path.startsWith('/gists/')
         ? 'proofs'
-        : path.endsWith('/timeline?per_page=100&page=1')
+        : path.includes('/timeline?')
           ? 'timeline'
-          : path.includes('/timeline?')
-            ? 'timeline'
-            : path.includes('/reviews?')
-              ? 'reviews'
-              : path.includes('/comments?')
-                ? 'comments'
-                : 'other';
+          : path.includes('/reviews?')
+            ? 'reviews'
+            : path.includes('/comments?')
+              ? 'comments'
+              : 'other';
   await sql`INSERT INTO pow_github_usage (bucket, category, requests)
     VALUES (date_trunc('hour',now()), ${category}, 1)
     ON CONFLICT (bucket,category) DO UPDATE SET requests=pow_github_usage.requests+1`;
-  return { token, reserve: resource === 'search' ? control.search_reserve : control.core_reserve };
+  return {
+    authorization,
+    reserve: resource === 'search' ? control.search_reserve : control.core_reserve,
+  };
 }
 
 export function quotaPauseUntil(response: Response, reserve: number, now = Date.now()) {

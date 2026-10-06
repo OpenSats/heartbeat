@@ -11,7 +11,7 @@ async function github<T>(path: string): Promise<T> {
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${budget.token}`,
+      Authorization: budget.authorization,
     },
     signal: AbortSignal.timeout(10000),
     redirect: 'error',

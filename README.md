@@ -182,11 +182,23 @@ last fetch time, result, and events returned by that fetch. The dots describe
 recorded fetches, not live connections. Older snapshots without provenance remain
 usable and are not refetched solely to populate this panel.
 
-PoW GitHub collection requires its own server-only `POW_GITHUB_TOKEN`. It never
-falls back to `GITHUB_TOKEN`, which remains the regular feed builder's credential.
-A different PAT for the same GitHub user still shares that user's quota. Use a
-credential belonging to a dedicated Heartbeat identity before resuming bulk
-collection. Submission services keep their existing configuration.
+PoW GitHub collection requires separate server-only credentials. It never falls
+back to `GITHUB_TOKEN`, which remains the regular feed builder's credential.
+Submission services keep their existing configuration.
+
+Recommended: register a dedicated OAuth App owned by OpenSats at
+https://github.com/organizations/OpenSats/settings/applications/new. Name it
+`Heartbeat PoW`, use `https://heartbeat.opensats.org` as its homepage, and
+`https://heartbeat.opensats.org/pow` as the required callback URL (no user login or
+OAuth redirect flow is used). Set `POW_GITHUB_CLIENT_ID` and
+`POW_GITHUB_CLIENT_SECRET` in Vercel for production and preview, then deploy.
+GitHub supports these credentials for public REST data with an app-level quota:
+https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#primary-rate-limit-for-oauth-apps
+
+Alternatively, set `POW_GITHUB_TOKEN` from a dedicated Heartbeat account with only
+public-data access. A different PAT for the same GitHub user still shares that
+user's quota. Partial OAuth App configuration fails closed, even if a PAT exists.
+Neither authentication method exposes credentials to browsers.
 
 Run `npm run db:migrate` to install the shared GitHub controls. Collection starts
 paused. `pow_github_control` caps all PoW requests (including discovery and
@@ -196,7 +208,8 @@ Adjust these limits in the database after measuring usage, not by adding workers
 
 With server environment variables loaded, run `tsx scripts/pow-github.ts status`,
 `pause`, or `resume`. Resume verifies the dedicated credential's available quota.
-Pause also installs a 30-day cooldown for older deployments. Deployments with the
+Resume also releases paused checkpoints for the hourly recovery job.
+Pause installs a 30-day cooldown for older deployments. Deployments with the
 new control remain paused until explicitly resumed. Cached pages and Nostr
 collection remain available. `pow_github_usage` records hourly request counts by
 category, without account identities, to guide further cache/query improvements.
