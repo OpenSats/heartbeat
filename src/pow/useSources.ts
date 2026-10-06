@@ -3,7 +3,13 @@ import { sourcesFromUrl, parseSource, type IdentityResolution } from './model';
 
 export function useSources(params: URLSearchParams, suppliedParams = params) {
   const [resolutions, setResolutions] = useState<Record<string, IdentityResolution>>({});
-  const parsed = useMemo(() => sourcesFromUrl(params, resolutions), [params, resolutions]);
+  const sourceParams = new URLSearchParams(
+    [...params].filter(([key]) => ['p', 'gh', 'ngit', 'repo'].includes(key)),
+  ).toString();
+  const parsed = useMemo(
+    () => sourcesFromUrl(new URLSearchParams(sourceParams), resolutions),
+    [sourceParams, resolutions],
+  );
   const suppliedSourceKeys = useMemo(
     () => new Set(sourcesFromUrl(suppliedParams, resolutions).sources.map((source) => source.key)),
     [suppliedParams, resolutions],
