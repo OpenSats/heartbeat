@@ -491,7 +491,7 @@ export function Pow() {
   const range = useMemo(() => activityRange(year), [year]);
   const [filter, setFilter] = useState('all');
   const [kind, setKind] = useState('all');
-  const [query, setQuery] = useState('');
+  const query = params.get('q') ?? '';
   const [repo, setRepo] = useState('');
   const [day, setDay] = useState('');
   const [copied, setCopied] = useState(false);
@@ -505,7 +505,7 @@ export function Pow() {
   } = useSources(params, suppliedParams);
   const addDiscoveredAccounts = useMemo(
     () => (accounts: DiscoveredAccount[]) => {
-      const next = new URLSearchParams(params);
+      const next = powParams(location.pathname, location.search);
       let remaining = 8 - sources.length;
       let changed = false;
       for (const account of accounts) {
@@ -525,7 +525,7 @@ export function Pow() {
       setNpub(next.get('p') ?? '');
       setGh(next.getAll('gh').join(', '));
     },
-    [params, sources, suppliedParams],
+    [sources, suppliedParams],
   );
   const accountEvidence = useAccountDiscovery(sources, addDiscoveredAccounts);
   const displayName = useNip05Labels(sources.map((source) => source.label.split('/')[0]));
@@ -666,6 +666,18 @@ export function Pow() {
   );
   const activeDays = new Set(filtered.map(({ event }) => event.timestamp.slice(0, 10))).size;
   const repoCount = new Set(filtered.map(({ event }) => event.repo).filter(Boolean)).size;
+  function setQuery(value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set('q', value);
+    else next.delete('q');
+    history.replaceState(
+      { powSuppliedParams: suppliedParams.toString() },
+      '',
+      powUrl(next, location.pathname),
+    );
+    setParams(next);
+    setDay('');
+  }
   function selectYear(value: number | null) {
     const next = new URLSearchParams(params);
     if (value === null) next.delete('year');
@@ -679,11 +691,11 @@ export function Pow() {
     setDay('');
     setKind('all');
     setRepo('');
-    setQuery('');
   }
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const next = new URLSearchParams();
+    if (query) next.set('q', query);
     if (year !== null) next.set('year', String(year));
     if (npub.trim()) next.set('p', npub.trim());
     for (const value of gh

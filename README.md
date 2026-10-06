@@ -26,6 +26,12 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
+Use `q=` to prefill the activity filter, for example `/pow/shroominic?q=routstr`.
+It uses the same case-insensitive text search as the filter field, matching repository
+names, activity titles, and authors. Timeline entries, heatmaps, and counts update
+together. Editing or clearing the filter updates the URL; the filter survives
+sharing, reloads, year changes, and browser back/forward navigation.
+
 `nprofile` identifiers work in `/pow/nprofile…`, `p=`, and `ngit=`, including
 the `nostr:` prefix. They use the same public-key cache as the equivalent `npub`;
 relay discovery continues to use the account’s outbox list and fallback relays.
