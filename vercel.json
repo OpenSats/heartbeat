@@ -31,6 +31,9 @@
     "api/pow/og.ts": {
       "maxDuration": 30,
       "includeFiles": "node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff"
+    },
+    "api/pow/recover.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
@@ -66,5 +69,11 @@
       ]
     }
   ],
-  "buildCommand": "npm run build:vercel"
+  "buildCommand": "npm run build:vercel",
+  "crons": [
+    {
+      "path": "/api/pow/recover",
+      "schedule": "17 * * * *"
+    }
+  ]
 }
