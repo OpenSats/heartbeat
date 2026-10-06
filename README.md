@@ -185,8 +185,8 @@ usable and are not refetched solely to populate this panel.
 PoW GitHub collection requires its own server-only `POW_GITHUB_TOKEN`. It never
 falls back to `GITHUB_TOKEN`, which remains the regular feed builder's credential.
 A different PAT for the same GitHub user still shares that user's quota. Use a
-separate integration identity, and isolate submission services with a GitHub App
-installation token before resuming bulk collection.
+credential belonging to a dedicated Heartbeat identity before resuming bulk
+collection. Submission services keep their existing configuration.
 
 Run `npm run db:migrate` to install the shared GitHub controls. Collection starts
 paused. `pow_github_control` caps all PoW requests (including discovery and
