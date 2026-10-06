@@ -1,3 +1,4 @@
+import { reserveGithubRequest, observeGithubQuota } from './github-budget.js';
 import { neon } from '@neondatabase/serverless';
 import type { AccountEvidence } from '../src/pow/discoverAccounts.js';
 import { parseSource } from '../src/pow/model.js';
@@ -6,14 +7,16 @@ import { githubDiscoverySlot, githubCooldown } from './rate-limit.js';
 
 async function github<T>(path: string): Promise<T> {
   await githubDiscoverySlot();
+  const budget = await reserveGithubRequest('core', path);
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       Accept: 'application/vnd.github+json',
-      ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+      Authorization: `Bearer ${budget.token}`,
     },
     signal: AbortSignal.timeout(10000),
     redirect: 'error',
   });
+  await observeGithubQuota('core', response, budget.reserve);
   if (response.status === 403 || response.status === 429)
     throw await githubCooldown('core', response);
   if (!response.ok) throw new Error('GitHub source unavailable.');

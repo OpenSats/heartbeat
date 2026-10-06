@@ -182,6 +182,25 @@ last fetch time, result, and events returned by that fetch. The dots describe
 recorded fetches, not live connections. Older snapshots without provenance remain
 usable and are not refetched solely to populate this panel.
 
+PoW GitHub collection requires its own server-only `POW_GITHUB_TOKEN`. It never
+falls back to `GITHUB_TOKEN`, which remains the regular feed builder's credential.
+A different PAT for the same GitHub user still shares that user's quota. Use a
+separate integration identity, and isolate submission services with a GitHub App
+installation token before resuming bulk collection.
+
+Run `npm run db:migrate` to install the shared GitHub controls. Collection starts
+paused. `pow_github_control` caps all PoW requests (including discovery and
+previews) at 1,000 per UTC hour and reserves 1,000 remaining core requests and five
+search requests. Every GitHub response checks the remaining quota and reset time.
+Adjust these limits in the database after measuring usage, not by adding workers.
+
+With server environment variables loaded, run `tsx scripts/pow-github.ts status`,
+`pause`, or `resume`. Resume verifies the dedicated credential's available quota.
+Pause also installs a 30-day cooldown for older deployments. Deployments with the
+new control remain paused until explicitly resumed. Cached pages and Nostr
+collection remain available. `pow_github_usage` records hourly request counts by
+category, without account identities, to guide further cache/query improvements.
+
 Vercel Queues runs separate GitHub and Nostr consumers, configured in `vercel.json`.
 No extra queue credentials are needed on Vercel. GitHub has one worker per deployment;
 Nostr has two. A shared database throttle spaces GitHub search requests and honors

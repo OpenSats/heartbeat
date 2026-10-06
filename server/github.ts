@@ -1,3 +1,4 @@
+import { reserveGithubRequest, observeGithubQuota } from './github-budget.js';
 import { neon } from '@neondatabase/serverless';
 import { githubSlot, githubCooldown } from './rate-limit.js';
 import type { Activity, SearchTask, Snapshot, Source, GithubThreadTask } from '../src/pow/model.js';
@@ -37,14 +38,16 @@ class Gone extends Error {}
 async function github<T>(path: string): Promise<T> {
   const resource = path.startsWith('/search/') ? 'search' : 'core';
   await githubSlot(resource);
+  const budget = await reserveGithubRequest(resource, path);
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       Accept: 'application/vnd.github+json',
-      ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+      Authorization: `Bearer ${budget.token}`,
     },
     signal: AbortSignal.timeout(12000),
     redirect: 'error',
   });
+  await observeGithubQuota(resource, response, budget.reserve);
   if (response.status === 403 || response.status === 429)
     throw await githubCooldown(resource, response);
   if (response.headers.get('x-ratelimit-remaining') === '0')
