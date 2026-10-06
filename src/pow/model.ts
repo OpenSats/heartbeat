@@ -119,14 +119,16 @@ export function parseSource(kind: string, input: string): Source {
     return { key: `github:${value}`, kind, value, label: value };
   }
   if (kind === 'nostr' || kind === 'ngit') {
-    value = value.replace(/^nostr:/, '');
+    value = value.replace(/^nostr:/i, '');
     const decoded = nip19.decode(value);
-    if (decoded.type !== 'npub') throw new Error('Enter a Nostr npub.');
+    if (decoded.type !== 'npub' && decoded.type !== 'nprofile')
+      throw new Error('Enter a Nostr npub or nprofile.');
+    const pubkey = decoded.type === 'nprofile' ? decoded.data.pubkey : decoded.data;
     return {
-      key: `${kind}:${decoded.data}`,
+      key: `${kind}:${pubkey}`,
       kind,
-      value: decoded.data,
-      label: nip19.npubEncode(decoded.data),
+      value: pubkey,
+      label: nip19.npubEncode(pubkey),
     };
   }
   if (
@@ -169,7 +171,10 @@ export function sourcesFromUrl(
     for (const input of params.getAll(parameter).filter(Boolean)) {
       try {
         let resolved = input;
-        if (['nostr', 'ngit'].includes(kind) && !/^(nostr:)?npub1/i.test(input.trim())) {
+        if (
+          ['nostr', 'ngit'].includes(kind) &&
+          !/^(nostr:)?(?:npub|nprofile)1/i.test(input.trim())
+        ) {
           const { address } = nip05Address(input);
           const resolution = resolutions[address];
           if (resolution?.error) throw new Error(resolution.error);

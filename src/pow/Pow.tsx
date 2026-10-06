@@ -778,7 +778,7 @@ export function Pow() {
               <span className="text-zinc-600 text-xs shrink-0 w-14">nostr:</span>
               <input
                 className={inputClass}
-                placeholder="npub1…, domain, or name@domain"
+                placeholder="npub, nprofile, domain, or name@domain"
                 value={npub}
                 onChange={(e) => setNpub(e.target.value)}
                 spellCheck={false}

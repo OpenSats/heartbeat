@@ -26,6 +26,10 @@ against that database. For local setup using pulled Vercel variables:
 `node --env-file=.env.local --import tsx scripts/migrate-pow.ts`.
 Use `vercel dev` for the frontend and API together.
 
+`nprofile` identifiers work in `/pow/nprofile…`, `p=`, and `ngit=`, including
+the `nostr:` prefix. They use the same public-key cache as the equivalent `npub`;
+relay discovery continues to use the account’s outbox list and fallback relays.
+
 `p=` and `ngit=` also accept NIP-05 addresses, such as `dergigi.com`,
 `fiatjaf.com`, or `sync@nostr.boutique`. Bare domains resolve the `_` name.
 The browser resolves each address independently through `/api/pow/resolve`, then

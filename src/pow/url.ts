@@ -7,7 +7,7 @@ function pathSource(pathname: string) {
   } catch {
     value = match[1];
   }
-  const parameter = /^(nostr:)?npub1/i.test(value) || /[.@]/.test(value) ? 'p' : 'gh';
+  const parameter = /^(nostr:)?(?:npub|nprofile)1/i.test(value) || /[.@]/.test(value) ? 'p' : 'gh';
   return { parameter, value };
 }
 

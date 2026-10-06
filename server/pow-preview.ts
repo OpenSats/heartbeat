@@ -108,6 +108,7 @@ export async function loadPreview(params: URLSearchParams): Promise<Preview> {
     'Public activity';
   const github = sources.find((s) => s.kind === 'github');
   const nostr = sources.find((s) => s.kind === 'nostr' || s.kind === 'ngit');
+  if (nostr && /^(nostr:)?(?:npub|nprofile)1/i.test(label)) label = nostr.label;
   const profiles = await Promise.allSettled([
     github ? read('github', github.value) : Promise.resolve(null),
     nostr ? read('nostr', nostr.label) : Promise.resolve(null),
