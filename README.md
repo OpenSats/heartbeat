@@ -178,7 +178,13 @@ Nostr has two. A shared database throttle spaces GitHub search requests and hono
 rate-limit reset and Retry-After headers across deployments. Jobs contain one source
 and one month. Leases deduplicate jobs across visitors, preview, and production.
 The page polls cached results every ten seconds; queued jobs continue after it closes.
-Queue messages expire after seven days; revisiting a source recovers expired jobs.
+Each continuation receives a fresh seven-day queue lifetime. An hourly production
+cron at `/api/pow/recover` requeues up to 100 expired jobs, newest months first,
+using their saved checkpoints. It skips active leases, provider cooldowns, and
+obsolete cache versions. Jobs stopped after five consecutive fetch failures still
+require a new source request. Set a random server-only `CRON_SECRET` in Vercel;
+Vercel sends it as a Bearer token when invoking the recovery endpoint. Recovery
+uses existing source cache rows and does not store account associations.
 Production and previews share the cache, so schema changes must remain backwards
 compatible. The old budget table is retained for older previews but these workers
 no longer use it. Very large month responses are bounded at 3 MB and explicitly

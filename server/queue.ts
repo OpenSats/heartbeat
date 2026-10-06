@@ -5,6 +5,7 @@ import { RetryLater } from './rate-limit.js';
 import { sourceCacheKey, hasPending, sourcePlatform, type Source } from '../src/pow/model.js';
 
 export const queue = new QueueClient({ region: 'iad1' });
+const RETENTION_SECONDS = 7 * 24 * 60 * 60;
 type Job = { source: Source; month: string; token: string };
 
 export async function enqueue(source: Source, month: string) {
@@ -18,20 +19,21 @@ export async function enqueue(source: Source, month: string) {
     ON CONFLICT (source_key) DO UPDATE SET job_token = ${token}, queued_until = now() + interval '2 minutes', failure_count = 0
     WHERE pow_sources.queued_until IS NULL OR pow_sources.queued_until < now()
     RETURNING source_key`;
-  if (!rows.length) return;
+  if (!rows.length) return false;
   try {
     await queue.send(
       sourcePlatform(source) === 'github' ? 'pow-github' : 'pow-nostr',
       { source, month, token },
       {
         idempotencyKey: token,
-        retentionSeconds: 604800,
+        retentionSeconds: RETENTION_SECONDS,
       },
     );
-    await sql`UPDATE pow_sources SET queued_until = now() + interval '7 days'
+    await sql`UPDATE pow_sources SET queued_until = GREATEST(queued_until, now() + interval '7 days')
       WHERE source_key = ${key} AND job_token = ${token} AND queued_until IS NOT NULL`;
+    return true;
   } catch (error) {
-    await sql`UPDATE pow_sources SET queued_until = NULL WHERE source_key = ${key} AND job_token = ${token}`;
+    await sql`UPDATE pow_sources SET queued_until = now() WHERE source_key = ${key} AND job_token = ${token}`;
     throw error;
   }
 }
@@ -43,7 +45,7 @@ export const consume = queue.handleNodeCallback<Job>(
     const [job] =
       await sql`SELECT job_token, failure_count FROM pow_sources WHERE source_key = ${key}`;
     if (job?.job_token !== token) return;
-    await sql`UPDATE pow_sources SET queued_until = ${metadata.expiresAt.toISOString()}
+    await sql`UPDATE pow_sources SET queued_until = GREATEST(queued_until, ${metadata.expiresAt.toISOString()}::timestamptz)
     WHERE source_key = ${key} AND job_token = ${token}`;
     let cached = await readCache(source, month);
     try {
@@ -72,13 +74,12 @@ export const consume = queue.handleNodeCallback<Job>(
         { source, month, token },
         {
           idempotencyKey: `${metadata.messageId}:next`,
-          delaySeconds: error.afterSeconds,
-          retentionSeconds: Math.max(
-            60,
-            Math.ceil((metadata.expiresAt.getTime() - Date.now()) / 1000),
-          ),
+          delaySeconds: Math.min(error.afterSeconds, RETENTION_SECONDS - 60),
+          retentionSeconds: RETENTION_SECONDS,
         },
       );
+      await sql`UPDATE pow_sources SET queued_until = GREATEST(queued_until, now() + interval '7 days')
+        WHERE source_key = ${key} AND job_token = ${token} AND queued_until IS NOT NULL`;
       return;
     }
     await sql`UPDATE pow_sources SET queued_until = NULL,
