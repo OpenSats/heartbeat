@@ -4,7 +4,7 @@ export function nip05Address(input: string) {
     .replace(/^nostr:/, '')
     .toLowerCase();
   const parts = value.split('@');
-  if (parts.length > 2) throw new Error('Enter an npub, a domain, or name@domain.');
+  if (parts.length > 2) throw new Error('Enter an npub, nprofile, domain, or name@domain.');
   const name = parts.length === 2 ? parts[0] : '_';
   const domain = parts.at(-1)!;
   if (
@@ -12,6 +12,6 @@ export function nip05Address(input: string) {
     domain.length > 253 ||
     !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain)
   )
-    throw new Error('Enter an npub, a domain, or name@domain.');
+    throw new Error('Enter an npub, nprofile, domain, or name@domain.');
   return { name, domain, address: `${name}@${domain}` };
 }
