@@ -196,6 +196,33 @@ repos:
   - zerosync/zerosync
   - zeugmaster/CashuSwift
   - zeugmaster/macadamia
+  - provider: gitlab
+    repo: tpo/network-health/metrics/aggregator-rs
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/metrics/collector-rs
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/metrics/datamodel
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/metrics/descriptorParser
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/metrics/metrics-website
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/metrics/networkstatusapi
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/services
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/team
+    host: gitlab.torproject.org
+  - provider: gitlab
+    repo: tpo/network-health/tor_anomalies
+    host: gitlab.torproject.org
   - provider: forgejo
     repo: rust-bitcoin/rust-bitcoin-maintainer-tools
     host: git.rust-bitcoin.org
