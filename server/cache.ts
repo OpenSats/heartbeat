@@ -68,7 +68,7 @@ export async function readCache(
     refreshing:
       (!!row?.lease_until && Date.parse(row.lease_until) > now) ||
       (!!row?.queued_until && Date.parse(row.queued_until) > now),
-    stale: !row?.fetched_at || Date.parse(row.fetched_at) < now - ttl,
+    stale: !row?.snapshot || !row?.fetched_at || Date.parse(row.fetched_at) < now - ttl,
     retry: !row?.retry_at || Date.parse(row.retry_at) <= now,
     error: row?.error ?? null,
     retryAt: row?.retry_at ? new Date(row.retry_at).toISOString() : null,
@@ -85,7 +85,7 @@ export async function claimRefresh(source: Source, month: string) {
     ON CONFLICT (source_key) DO UPDATE SET lease_token = ${token}, lease_until = now() + interval '90 seconds'
     WHERE (pow_sources.lease_until IS NULL OR pow_sources.lease_until < now())
       AND (pow_sources.retry_at IS NULL OR pow_sources.retry_at < now())
-      AND (pow_sources.fetched_at IS NULL OR (${closedMonth} AND pow_sources.snapshot #>> '{windows,0,to}' < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingGithub', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingRelays', '[]'::jsonb)) > 0 OR (pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' AND pow_sources.fetched_at < now() - interval '1 hour') OR (NOT ${closedMonth} AND pow_sources.fetched_at < now() - interval '24 hours'))
+      AND (pow_sources.snapshot IS NULL OR pow_sources.fetched_at IS NULL OR (${closedMonth} AND COALESCE(pow_sources.snapshot #>> '{windows,0,to}', '') < ${end}) OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pending', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingGithub', '[]'::jsonb)) > 0 OR jsonb_array_length(COALESCE(pow_sources.snapshot->'pendingRelays', '[]'::jsonb)) > 0 OR (pow_sources.snapshot #>> '{windows,0,exhaustive}' = 'false' AND pow_sources.fetched_at < now() - interval '1 hour') OR (NOT ${closedMonth} AND pow_sources.fetched_at < now() - interval '24 hours'))
     RETURNING source_key`;
   return lease.length ? token : null;
 }
