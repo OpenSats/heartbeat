@@ -1,3 +1,4 @@
+import { githubResponse } from './github-http.js';
 import { reserveGithubRequest, observeGithubQuota } from './github-budget.js';
 import { neon } from '@neondatabase/serverless';
 import { githubSlot, githubCooldown } from './rate-limit.js';
@@ -36,25 +37,23 @@ export type GithubRequest = <T>(path: string) => Promise<T>;
 class Gone extends Error {}
 
 async function github<T>(path: string): Promise<T> {
-  const resource = path.startsWith('/search/') ? 'search' : 'core';
-  await githubSlot(resource);
-  const budget = await reserveGithubRequest(resource, path);
-  const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: budget.authorization,
-    },
-    signal: AbortSignal.timeout(12000),
-    redirect: 'error',
+  const response = await githubResponse(path, async (endpoint) => {
+    const resource = endpoint.startsWith('/search/') ? 'search' : 'core';
+    await githubSlot(resource);
+    const budget = await reserveGithubRequest(resource, endpoint);
+    const response = await fetch(`https://api.github.com${endpoint}`, {
+      headers: { Accept: 'application/vnd.github+json', Authorization: budget.authorization },
+      signal: AbortSignal.timeout(12000),
+      redirect: 'manual',
+    });
+    await observeGithubQuota(resource, response, budget.reserve);
+    if (response.status === 403 || response.status === 429)
+      throw await githubCooldown(resource, response);
+    return response;
   });
-  await observeGithubQuota(resource, response, budget.reserve);
-  if (response.status === 403 || response.status === 429)
-    throw await githubCooldown(resource, response);
-  if (response.headers.get('x-ratelimit-remaining') === '0')
-    await githubCooldown(resource, response);
   if (response.status === 404 || response.status === 410)
     throw new Gone('GitHub public source is unavailable.');
-  if (!response.ok) throw new Error(`GitHub is unavailable (${response.status}).`);
+  if (!response.ok) throw new Error(`GitHub ${path} is unavailable (${response.status}).`);
   return response.json() as Promise<T>;
 }
 

@@ -116,7 +116,11 @@ export async function refresh(source: Source, token: string, month: string) {
       retry_at = NULL, lease_until = NULL, lease_token = NULL WHERE source_key = ${key} AND lease_token = ${token}`;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Source unavailable.';
-    const delay = error instanceof RetryLater ? error.afterSeconds : 120;
+    const [state] = await sql`SELECT failure_count FROM pow_sources WHERE source_key = ${key}`;
+    const delay =
+      error instanceof RetryLater
+        ? error.afterSeconds
+        : Math.min(3600, 120 * 2 ** (state?.failure_count ?? 0));
     await sql`UPDATE pow_sources SET error = ${message.slice(0, 250)}, failure_count = failure_count + ${error instanceof RetryLater ? 0 : 1}, retry_at = now() + ${delay} * interval '1 second',
       lease_until = NULL, lease_token = NULL WHERE source_key = ${key} AND lease_token = ${token}`;
   }
