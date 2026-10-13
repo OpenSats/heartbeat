@@ -1,3 +1,4 @@
+import { displayText } from './display-text.js';
 import { githubResponse } from './github-http.js';
 import { reserveGithubRequest, observeGithubQuota } from './github-budget.js';
 import { neon } from '@neondatabase/serverless';
@@ -115,7 +116,7 @@ export function threadActivities(task: GithubThreadTask, entries: ThreadEntry[])
         actor,
         repo: task.repo,
         url: entry.html_url?.startsWith(`${base}/`) ? entry.html_url : url,
-        title: (category === 'status' ? task.title : `${task.title} · ${detail}`).slice(0, 1000),
+        title: displayText(category === 'status' ? task.title : `${task.title} · ${detail}`, 1000),
       },
     ];
   });
@@ -307,7 +308,13 @@ export async function collectGithub(
           ? ['timeline', 'reviews', 'review-comments']
           : ['timeline'];
         for (const endpoint of endpoints)
-          details.push({ repo, number: i.number, title: i.title.slice(0, 500), endpoint, page: 1 });
+          details.push({
+            repo,
+            number: i.number,
+            title: displayText(i.title, 500),
+            endpoint,
+            page: 1,
+          });
       }
       const total = task.total ?? page.total_count;
       const seen = (task.seen ?? 0) + page.items.length;

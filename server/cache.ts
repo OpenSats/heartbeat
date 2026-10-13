@@ -1,3 +1,4 @@
+import { displayText } from './display-text.js';
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import { RetryLater } from './rate-limit.js';
@@ -97,7 +98,7 @@ export async function refresh(source: Source, token: string, month: string) {
     // Bound a single response below Vercel's payload limit without implying full coverage.
     snapshot.events = snapshot.events.map((event) => ({
       ...event,
-      title: event.title.slice(0, 1000),
+      title: displayText(event.title, 1000),
     }));
     snapshot.events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     if (Buffer.byteLength(JSON.stringify(snapshot)) > 3_000_000) {

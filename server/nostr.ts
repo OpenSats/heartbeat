@@ -1,3 +1,4 @@
+import { displayText } from './display-text.js';
 import { neon } from '@neondatabase/serverless';
 import { nip19, verifyEvent, type Event } from 'nostr-tools';
 import { relayUrl } from '../src/pow/ngit.js';
@@ -122,7 +123,7 @@ export async function collectNostr(
         id: event.id,
         timestamp: new Date(event.created_at * 1000).toISOString(),
         type: event.tags.some((tag) => tag[0] === 'e') ? 'reply' : 'post',
-        title: event.content.slice(0, 4000),
+        title: displayText(event.content, 4000),
         url: `https://njump.to/${nip19.noteEncode(event.id)}`,
         actor: source.label,
       });

@@ -1,3 +1,4 @@
+import { displayText } from './display-text.js';
 import { neon } from '@neondatabase/serverless';
 import { nip19, type Event, type Filter } from 'nostr-tools';
 import {
@@ -40,7 +41,7 @@ export function codeActivity(event: Event, relay?: string): Activity | null {
     id: event.id,
     timestamp: new Date(event.created_at * 1000).toISOString(),
     type,
-    title: title.slice(0, 1000),
+    title: displayText(title, 1000),
     actor: nip19.npubEncode(event.pubkey),
     repo,
     url: `https://njump.to/${nip19.neventEncode({ id: event.id, author: event.pubkey, kind: event.kind, relays: relay ? [relay] : [] })}`,
