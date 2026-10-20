@@ -117,6 +117,7 @@ export function parseSource(kind: string, input: string): Source {
       .toLowerCase();
     if (!/^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/.test(value))
       throw new Error('Enter a GitHub handle or profile URL.');
+    if (value === 'dependabot') throw new Error('Dependabot account backfills are disabled.');
     return { key: `github:${value}`, kind, value, label: value };
   }
   if (kind === 'nostr' || kind === 'ngit') {

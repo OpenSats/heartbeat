@@ -9,6 +9,7 @@ const RETENTION_SECONDS = 7 * 24 * 60 * 60;
 type Job = { source: Source; month: string; token: string };
 
 export async function enqueue(source: Source, month: string) {
+  if (source.kind === 'github' && source.value.toLowerCase() === 'dependabot') return false;
   const sql = database();
   const key = sourceCacheKey(source, month);
   const token = randomUUID();
@@ -45,6 +46,10 @@ export const consume = queue.handleNodeCallback<Job>(
     const [job] =
       await sql`SELECT job_token, failure_count FROM pow_sources WHERE source_key = ${key}`;
     if (job?.job_token !== token) return;
+    if (source.kind === 'github' && source.value.toLowerCase() === 'dependabot') {
+      await sql`UPDATE pow_sources SET queued_until=NULL,job_token=NULL WHERE source_key=${key} AND job_token=${token}`;
+      return;
+    }
     await sql`UPDATE pow_sources SET queued_until = GREATEST(queued_until, ${metadata.expiresAt.toISOString()}::timestamptz)
     WHERE source_key = ${key} AND job_token = ${token}`;
     let cached = await readCache(source, month);

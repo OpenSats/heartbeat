@@ -251,3 +251,8 @@ test('resumed invalid subdivisions are cleared while existing activity is retain
   assert.deepEqual(result.events, [event]);
   assert.equal(hasPending(result), false);
 });
+
+test('Dependabot person backfills are excluded without excluding repository context', () => {
+  assert.throws(() => parseSource('github', 'Dependabot'), /backfills are disabled/);
+  assert.equal(parseSource('repo', 'dependabot/dependabot-core').kind, 'repo');
+});
