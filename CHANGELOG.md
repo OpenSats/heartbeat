@@ -7,12 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-20
+
 ### Added
 
-- Support for plain git remotes (`provider: git`) via shallow clones, e.g.
-  the WireGuard repos on [git.zx2c4.com](https://git.zx2c4.com/). Commits
-  and tags only; links use cgit-style URLs.
-- WireGuard repos tracked in the general fund.
+- Person and repository activity pages at `/pow`, combining GitHub, Nostr, and
+  ngit activity with separate or combined heatmaps, year selection, and filters.
+- Npub, nprofile, and NIP-05 input, with account discovery and proof indicators.
+- Cached activity previews for shared links, plus relay fetch details.
+- GitHub comments, reviews, and status changes; Nostr outbox relay discovery.
+- Background backfills, historical caching, and hourly recovery of unfinished jobs.
+- A dedicated PoW GitHub OAuth app and shared request budgets to isolate its quota
+  from application and report submissions.
+- JSON downloads of the current filtered view on Heartbeat and PoW, including
+  source coverage and fetch status for PoW exports.
+- GitLab, Forgejo, and plain git repository providers, including Tor network health
+  and WireGuard repositories in the General Fund.
+
+### Changed
+
+- Developer filters link to PoW; PoW defaults to a combined heatmap.
+- Shared text filters through `?q=` and consistent activity filter groups.
+- Incremental timeline rendering keeps large feeds responsive.
+- Dependabot account backfills are disabled; repository activity remains supported.
+
+### Fixed
+
+- Reject commit search pages with unrelated authors before splitting or paginating,
+  retaining collected activity and continuing with issues and reviews. Commit
+  coverage remains explicitly incomplete when GitHub ignores the author filter.
+- Follow repository redirects within GitHub's API and back off failed requests.
+- Preserve Unicode characters when truncating cached activity text.
+- Renew backfill queue retention and recover expired, unqueued, or partial months.
 
 ## [0.1.0] - 2026-04-29
 
@@ -63,5 +89,6 @@ as a static JSON file, so visitors never hit the GitHub API directly.
 - Filter-driven work is deferred via `useDeferredValue` and the
   query-to-repos auto-select is debounced to coalesce history writes.
 
-[Unreleased]: https://github.com/OpenSats/heartbeat/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/OpenSats/heartbeat/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/OpenSats/heartbeat/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/OpenSats/heartbeat/releases/tag/v0.1.0
