@@ -340,3 +340,7 @@ Use these paths on your Heartbeat deployment:
 - `/pow/callebtc?p=npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg`
 - `/pow/npub1n3w4uts2r4srq3adqu9trp953dflcnw7ppn72tad4htkpsckwcmqjef6um?gh=BoltTouring`
 - `/pow/DanConwayDev?p=npub15qydau2hjma6ngxkl2cyar74wzyjshvl65za5k5rl69264ar2exs5cyejr`
+
+### JSON export
+
+The download icon in the header exports the currently filtered activity as JSON, on both Heartbeat and `/pow`. It includes all matching loaded events, not just the visible timeline rows. PoW exports include the selected period, sources, fetch status, and coverage information. Exporting does not fetch additional history.

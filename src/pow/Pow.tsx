@@ -1,3 +1,4 @@
+import { ExportButton } from '../components/ExportButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RelayInfo } from './RelayInfo';
 import { Timeline } from '../components/Timeline';
@@ -113,6 +114,9 @@ function SourceStatus({
         snapshot: snapshots.length
           ? {
               events: [...activities.values()],
+              githubCommitSearchUnavailable: snapshots.some(
+                (snapshot) => snapshot.githubCommitSearchUnavailable,
+              ),
               windows,
               relayFetches: latestRelayFetches(
                 snapshots.flatMap((snapshot) => snapshot.relayFetches ?? []),
@@ -774,6 +778,39 @@ export function Pow() {
               </svg>
             </button>
             <RelayInfo sources={sources} results={results} />
+            {sources.length > 0 && (
+              <ExportButton
+                filename="heartbeat-pow.json"
+                getData={() => ({
+                  schemaVersion: 1,
+                  view: 'pow',
+                  exportedAt: new Date().toISOString(),
+                  url: location.href,
+                  period: range,
+                  filters: { source: filter, type: kind, query, repo, day },
+                  sources: sources
+                    .filter((source) => matchesSource(source, filter))
+                    .map((source) => {
+                      const result = results[source.key];
+                      return {
+                        source,
+                        fetchedAt: result?.fetchedAt ?? null,
+                        loading: !result || result.refreshing,
+                        stale: result?.stale ?? true,
+                        error: result?.error ?? null,
+                        monthsLoaded: result?.monthsLoaded ?? 0,
+                        monthsTotal: result?.monthsTotal,
+                        coverage: result?.snapshot?.coverage ?? null,
+                        windows: result?.snapshot?.windows ?? [],
+                        commitSearchUnavailable:
+                          result?.snapshot?.githubCommitSearchUnavailable ?? false,
+                      };
+                    }),
+                  events: visible.map(({ event, source }) => ({ ...event, sourceKey: source.key })),
+                })}
+              />
+            )}
+
             <a
               href="https://opensats.org"
               target="_blank"

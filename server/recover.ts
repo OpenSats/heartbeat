@@ -27,6 +27,7 @@ export function recoveryCandidates(sql = database()) {
   return sql`
     SELECT source_key, job_token FROM pow_sources
     WHERE failure_count < 5
+      AND source_key NOT LIKE 'github:dependabot:%'
       AND (queued_until IS NULL OR queued_until < now())
       AND (
         queued_until < now()

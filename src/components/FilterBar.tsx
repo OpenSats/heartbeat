@@ -24,6 +24,7 @@ type Props = {
   typeFilter: FilterControl;
   actorFilter: FilterControl;
   actorPowHref?: string;
+  exportButton?: React.ReactNode;
 };
 
 const clearIfActive = (f: FilterControl) => (f.selected != null ? f.clear : undefined);
@@ -86,6 +87,7 @@ export function FilterBar({
   typeFilter,
   actorFilter,
   actorPowHref,
+  exportButton,
 }: Props) {
   const selectedActors = actorFilter.selected;
   const [repoQuery, setRepoQuery] = useUrlString('q');
@@ -195,14 +197,17 @@ export function FilterBar({
           <img src={markUrl} alt="" className="h-7 w-7 shrink-0 filter-[brightness(0)_invert(1)]" />
           <h1 className="text-zinc-100 text-base font-medium">heartbeat</h1>
         </button>
-        <a
-          href="https://opensats.org"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors"
-        >
-          by OpenSats
-        </a>
+        <div className="flex items-center gap-3">
+          {exportButton}
+          <a
+            href="https://opensats.org"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-zinc-600 hover:text-zinc-300 text-xs transition-colors"
+          >
+            by OpenSats
+          </a>
+        </div>
       </div>
 
       {fundNames.length > 0 && (

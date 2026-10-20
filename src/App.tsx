@@ -1,3 +1,4 @@
+import { ExportButton } from './components/ExportButton';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { githubPowPath } from './lib/powLinks';
 import { loadEvents } from './lib/loadEvents';
@@ -139,6 +140,35 @@ export function App() {
           typeFilter={typeFilter}
           actorFilter={actorFilter}
           actorPowHref={actorPowHref}
+          exportButton={
+            <ExportButton
+              filename="heartbeat.json"
+              getData={() => ({
+                schemaVersion: 1,
+                view: 'heartbeat',
+                exportedAt: new Date().toISOString(),
+                url: location.href,
+                generatedAt: data.generatedAt,
+                windowDays: data.windowDays,
+                filters: {
+                  funds: [...(fundFilter.selected ?? [])],
+                  repos: [...(repoFilter.selected ?? [])],
+                  types: [...(typeFilter.selected ?? [])],
+                  devs: [...(actorFilter.selected ?? [])],
+                },
+                events: filtered.map((event) => ({
+                  id: event.id,
+                  repo: event.repo,
+                  type: event.type,
+                  timestamp: event.timestamp,
+                  actor: event.actor,
+                  title: event.title,
+                  url: event.url,
+                  shortId: event.shortId,
+                })),
+              })}
+            />
+          }
         />
       </div>
       <Timeline
