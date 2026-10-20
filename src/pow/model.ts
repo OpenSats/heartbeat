@@ -58,6 +58,7 @@ export function latestRelayFetches(fetches: RelayFetch[]): RelayFetch[] {
 export type Snapshot = {
   relayFetches?: RelayFetch[];
   githubVersion?: number;
+  githubCommitSearchUnavailable?: boolean;
   pendingGithub?: GithubThreadTask[];
   githubThreads?: string[];
   pendingRelays?: RelayTask[];

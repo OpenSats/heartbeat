@@ -184,6 +184,7 @@ export async function collectGithub(
     } else await request(`/users/${source.value}`);
   }
   const discoveryTo = new Date().toISOString();
+  let commitSearchUnavailable = previous?.githubCommitSearchUnavailable ?? false;
   const pending: SearchTask[] = resuming
     ? [...(previous.pending ?? [])]
     : [
@@ -210,10 +211,15 @@ export async function collectGithub(
               },
             ]),
       ];
+  if (commitSearchUnavailable) {
+    for (let i = pending.length - 1; i >= 0; i--)
+      if (pending[i].endpoint === 'commits') pending.splice(i, 1);
+  }
   const details = resuming ? [...(previous.pendingGithub ?? [])] : [];
   const threads = new Set(resuming ? previous.githubThreads : []);
   const events = new Map<string, Activity>((previous?.events ?? []).map((e) => [e.id, e]));
-  let incomplete = resuming ? (previous.searchIncomplete ?? false) : false;
+  let incomplete =
+    commitSearchUnavailable || (resuming ? (previous.searchIncomplete ?? false) : false);
   const deadline = Date.now() + 25000;
   const publicRepos = new Set<string>();
   const add = (event: Activity) => {
@@ -255,6 +261,36 @@ export async function collectGithub(
         `/search/${task.endpoint}?q=${encodeURIComponent(query)}&sort=${field === 'author-date' ? 'author-date' : field}&order=desc&per_page=100&page=${task.page}`,
       );
       pending.shift();
+      // GitHub can silently ignore an author qualifier. Validate the page before
+      // trusting its count; splitting a global result set can consume weeks of quota.
+      if (
+        source.kind === 'github' &&
+        task.endpoint === 'commits' &&
+        page.items.some(
+          (item) => (item as Commit).author?.login.toLowerCase() !== source.value.toLowerCase(),
+        )
+      ) {
+        commitSearchUnavailable = true;
+        incomplete = true;
+        for (let i = pending.length - 1; i >= 0; i--)
+          if (pending[i].endpoint === 'commits') pending.splice(i, 1);
+        // Retain any correctly attributed commits in a mixed page.
+        for (const item of page.items) {
+          const c = item as Commit;
+          if (c.author?.login.toLowerCase() !== source.value.toLowerCase() || c.repository.private)
+            continue;
+          add({
+            id: c.html_url,
+            timestamp: c.commit.author.date,
+            type: 'commit',
+            title: c.commit.message.split('\n')[0],
+            url: c.html_url,
+            actor: c.author.login,
+            repo: c.repository.full_name,
+          });
+        }
+        continue;
+      }
       if (
         task.page === 1 &&
         page.total_count > 1000 &&
@@ -330,13 +366,14 @@ export async function collectGithub(
   const exhaustive = !pending.length && !details.length && !incomplete;
   return {
     githubVersion: 4,
+    githubCommitSearchUnavailable: commitSearchUnavailable,
     events: dedupeGithubActions([...events.values()]),
     pending,
     pendingGithub: details,
     githubThreads: [...threads],
     searchIncomplete: incomplete,
     profileUrl: `https://github.com/${source.value}`,
-    coverage: `${bounds.from.slice(0, 7)}: ${pending.length || details.length ? 'Backfill in progress' : exhaustive ? 'Discovered pages fetched' : 'Some GitHub results were unavailable or incomplete'}. Commits, issues, PRs, comments, reviews and status changes, attributed to the action author.${source.kind === 'github' ? ' Cross-repository discovery can miss threads; empty days cannot confirm inactivity.' : ' Repository context includes all contributors.'}`,
+    coverage: `${commitSearchUnavailable ? 'Commit search returned unrelated authors; commit coverage is incomplete. ' : ''}${bounds.from.slice(0, 7)}: ${pending.length || details.length ? 'Backfill in progress' : exhaustive ? 'Discovered pages fetched' : 'Some GitHub results were unavailable or incomplete'}. Commits, issues, PRs, comments, reviews and status changes, attributed to the action author.${source.kind === 'github' ? ' Cross-repository discovery can miss threads; empty days cannot confirm inactivity.' : ' Repository context includes all contributors.'}`,
     windows: [
       { ...bounds, exhaustive, basis: 'github-search', discoveryLimited: source.kind === 'github' },
     ],

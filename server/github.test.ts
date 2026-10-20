@@ -188,3 +188,66 @@ test('a merge counts once even when its implicit close arrives on another page',
     ['github:status:100', 'github:status:102'],
   );
 });
+
+test('unscoped commit search stops splitting and allows issue collection to continue', async () => {
+  const source = parseSource('github', 'target');
+  const paths: string[] = [];
+  const request: GithubRequest = async <T>(path: string) => {
+    paths.push(path);
+    if (path.startsWith('/users/')) return {} as T;
+    if (path.startsWith('/search/commits'))
+      return {
+        total_count: 4000000,
+        incomplete_results: false,
+        items: [{ author: { login: 'someone-else' } }],
+      } as T;
+    return { total_count: 0, incomplete_results: false, items: [] } as T;
+  };
+  const snapshot = await collectGithub(source, bounds, null, request);
+  assert.equal(paths.filter((p) => p.startsWith('/search/commits')).length, 1);
+  assert.equal(paths.filter((p) => p.startsWith('/search/issues')).length, 3);
+  assert.equal(snapshot.githubCommitSearchUnavailable, true);
+  assert.equal(hasPending(snapshot), false);
+  assert.equal(snapshot.windows?.[0].exhaustive, false);
+  paths.length = 0;
+  await collectGithub(source, bounds, snapshot, request);
+  assert.equal(
+    paths.some((p) => p.startsWith('/search/commits')),
+    false,
+  );
+});
+
+test('resumed invalid subdivisions are cleared while existing activity is retained', async () => {
+  const event = {
+    id: 'saved',
+    timestamp,
+    type: 'comment',
+    actor: 'target',
+    title: 'Saved',
+    url: 'https://github.com/a/b/issues/1',
+  };
+  const previous: Snapshot = {
+    githubVersion: 4,
+    events: [event],
+    coverage: '',
+    profileUrl: '',
+    windows: [{ ...bounds, exhaustive: false, basis: 'github-search' }],
+    pending: [
+      { endpoint: 'commits', from: bounds.from, to: bounds.to, page: 3 },
+      { endpoint: 'commits', from: bounds.from, to: bounds.to, page: 1 },
+      { endpoint: 'issues', mode: 'created', from: bounds.from, to: bounds.to, page: 1 },
+    ],
+  };
+  let commits = 0;
+  const request: GithubRequest = async <T>(path: string) => {
+    if (path.startsWith('/search/commits')) {
+      commits++;
+      return { total_count: 2000, items: [{ author: { login: 'other' } }] } as T;
+    }
+    return { total_count: 0, items: [] } as T;
+  };
+  const result = await collectGithub(parseSource('github', 'target'), bounds, previous, request);
+  assert.equal(commits, 1);
+  assert.deepEqual(result.events, [event]);
+  assert.equal(hasPending(result), false);
+});
