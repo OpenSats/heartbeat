@@ -256,3 +256,68 @@ test('Dependabot person backfills are excluded without excluding repository cont
   assert.throws(() => parseSource('github', 'Dependabot'), /backfills are disabled/);
   assert.equal(parseSource('repo', 'dependabot/dependabot-core').kind, 'repo');
 });
+
+test('rejected searches preserve events, discard subdivisions and continue thread discovery', async () => {
+  const { GithubSearchUnavailable } = await import('./github-http.js');
+  const source = parseSource('github', 'target');
+  const saved = {
+    id: 'saved',
+    timestamp,
+    type: 'commit',
+    title: 'Saved',
+    actor: 'target',
+    url: 'https://github.com/example/project/commit/abc',
+  };
+  const previous: Snapshot = {
+    githubVersion: 4,
+    events: [saved],
+    coverage: '',
+    profileUrl: '',
+    windows: [{ ...bounds, exhaustive: false, basis: 'github-search' }],
+    pending: [
+      { endpoint: 'issues', mode: 'created', ...bounds, page: 1 },
+      { endpoint: 'issues', mode: 'created', ...bounds, page: 2 },
+      { endpoint: 'issues', mode: 'involved', ...bounds, page: 1 },
+    ],
+  };
+  let rejected = 0;
+  const request: GithubRequest = async <T>(path: string) => {
+    if (path.startsWith('/search/')) {
+      const q = new URL(path, 'https://api.github.com').searchParams.get('q')!;
+      if (q.startsWith('author:')) {
+        rejected++;
+        throw new GithubSearchUnavailable();
+      }
+      return {
+        items: [{ ...issue, pull_request: undefined }],
+        total_count: 1,
+        incomplete_results: false,
+      } as T;
+    }
+    if (path === '/repos/example/project') return { private: false } as T;
+    if (path.includes('/timeline?'))
+      return [
+        {
+          id: 123,
+          event: 'commented',
+          user: { login: 'target' },
+          body: 'Found comment',
+          created_at: timestamp,
+        },
+      ] as T;
+    throw new Error(path);
+  };
+  const result = await collectGithub(source, bounds, previous, request);
+  assert.equal(rejected, 1);
+  assert.equal(hasPending(result), false);
+  assert.equal(result.events.length, 2);
+  assert.ok(result.events.some((e) => e.id === 'saved'));
+  assert.equal(result.searchIncomplete, true);
+  assert.equal(result.windows?.[0].exhaustive, false);
+  await assert.rejects(
+    collectGithub(source, bounds, previous, async () => {
+      throw new Error('temporary failure');
+    }),
+    /temporary failure/,
+  );
+});

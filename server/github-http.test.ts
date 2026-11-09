@@ -57,3 +57,29 @@ test('reports the failing endpoint and network cause', async () => {
     /GitHub \/repos\/test\/repo: ECONNRESET/,
   );
 });
+
+test('only unavailable-user search validation errors are skippable', async () => {
+  const { checkGithubSearchResponse, GithubSearchUnavailable } = await import('./github-http.js');
+  const body = {
+    errors: [
+      {
+        resource: 'Search',
+        field: 'q',
+        code: 'invalid',
+        message:
+          'The listed users cannot be searched either because the users do not exist or you do not have permission to view the users.',
+      },
+    ],
+  };
+  await assert.rejects(
+    checkGithubSearchResponse('/search/issues?q=author:test', Response.json(body, { status: 422 })),
+    GithubSearchUnavailable,
+  );
+  for (const response of [
+    Response.json(body, { status: 503 }),
+    Response.json({ message: 'Validation Failed' }, { status: 422 }),
+    new Response('invalid json', { status: 422 }),
+  ])
+    await checkGithubSearchResponse('/search/issues?q=author:test', response);
+  await checkGithubSearchResponse('/repos/test/repo', Response.json(body, { status: 422 }));
+});
