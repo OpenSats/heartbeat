@@ -1,5 +1,9 @@
 import { displayText } from './display-text.js';
-import { githubResponse } from './github-http.js';
+import {
+  githubResponse,
+  checkGithubSearchResponse,
+  GithubSearchUnavailable,
+} from './github-http.js';
 import { reserveGithubRequest, observeGithubQuota } from './github-budget.js';
 import { neon } from '@neondatabase/serverless';
 import { githubSlot, githubCooldown } from './rate-limit.js';
@@ -54,6 +58,7 @@ async function github<T>(path: string): Promise<T> {
   });
   if (response.status === 404 || response.status === 410)
     throw new Gone('GitHub public source is unavailable.');
+  await checkGithubSearchResponse(path, response);
   if (!response.ok) throw new Error(`GitHub ${path} is unavailable (${response.status}).`);
   return response.json() as Promise<T>;
 }
@@ -358,6 +363,16 @@ export async function collectGithub(
         pending.unshift({ ...task, page: task.page + 1, total, seen });
       else if (seen < total) incomplete = true;
     } catch (error) {
+      if (error instanceof GithubSearchUnavailable && !details.length && pending.length) {
+        // Drop subdivisions of this rejected query, but still try other discovery
+        // modes and retain already discovered thread work and activity.
+        const rejected = pending[0];
+        for (let i = pending.length - 1; i >= 0; i--)
+          if (pending[i].endpoint === rejected.endpoint && pending[i].mode === rejected.mode)
+            pending.splice(i, 1);
+        incomplete = true;
+        continue;
+      }
       // Persist successful pages before retrying a throttle or transient failure.
       if (requests > 0) break;
       throw error;

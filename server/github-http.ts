@@ -35,3 +35,27 @@ export async function githubResponse(
   }
   throw new Error(`GitHub ${path}: too many redirects.`);
 }
+
+export class GithubSearchUnavailable extends Error {}
+
+// Only this validation error means the account cannot be searched. Other 422s
+// (including abuse limits) must keep their normal retry/failure behavior.
+export async function checkGithubSearchResponse(path: string, response: Response) {
+  if (!path.startsWith('/search/') || response.status !== 422) return;
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as {
+    errors?: { resource?: string; field?: string; code?: string; message?: string }[];
+  } | null;
+  if (
+    body?.errors?.some(
+      (error) =>
+        error.resource === 'Search' &&
+        error.field === 'q' &&
+        error.code === 'invalid' &&
+        error.message?.includes('The listed users cannot be searched'),
+    )
+  )
+    throw new GithubSearchUnavailable('GitHub cannot search this account.');
+}
